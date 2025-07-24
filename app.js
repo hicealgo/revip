@@ -10,6 +10,25 @@ function logout() {
   renderLogin();
 }
 
+// --- Firebase Initialization ---
+const firebaseConfig = {
+  apiKey: "AIzaSyBN0o5zWH0qlXcCoSp0RXyzuADHNLTQ9HA",
+  authDomain: "revip-21caa.firebaseapp.com",
+  projectId: "revip-21caa",
+  storageBucket: "revip-21caa.firebasestorage.app",
+  messagingSenderId: "1045312930982",
+  appId: "1:1045312930982:web:0cea686e21024a35fca067",
+  measurementId: "G-0201KDSYTJ"
+};
+firebase.initializeApp(firebaseConfig);
+const auth = firebase.auth();
+const db = firebase.firestore();
+const analytics = firebase.analytics();
+
+// --- Auth State ---
+let currentUser = null;
+
+// --- Auth UI ---
 function renderLogin() {
   document.getElementById('app').innerHTML = `
     <div class="card text-center mt-2">
@@ -21,21 +40,52 @@ function renderLogin() {
     </div>
   `;
   document.getElementById('google-login').onclick = () => {
-    // Fake user
-    setUser({ nombre: 'Admin REVIP', email: 'admin@revip.com' });
-    renderDashboard();
+    const provider = new firebase.auth.GoogleAuthProvider();
+    auth.signInWithPopup(provider).catch(err => alert('Error de login: ' + err.message));
   };
 }
 
-function renderDashboard() {
-  const user = getUser();
+function logout() {
+  auth.signOut();
+}
+
+// --- Firestore Project Logic ---
+async function getProjects() {
+  if (!currentUser) return [];
+  const snap = await db.collection('users').doc(currentUser.uid).collection('projects').orderBy('lastModified', 'desc').get();
+  return snap.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+}
+async function saveProject(project) {
+  if (!currentUser) return;
+  const ref = db.collection('users').doc(currentUser.uid).collection('projects');
+  if (project.id) {
+    await ref.doc(project.id).set(project);
+  } else {
+    const doc = await ref.add(project);
+    project.id = doc.id;
+  }
+}
+async function deleteProject(id) {
+  if (!currentUser) return;
+  if (confirm('¿Seguro que desea eliminar este proyecto?')) {
+    await db.collection('users').doc(currentUser.uid).collection('projects').doc(id).delete();
+    renderProjectsList();
+  }
+}
+
+// --- Dashboard ---
+async function renderDashboard() {
+  const user = currentUser;
   document.getElementById('app').innerHTML = `
     <div class="flex flex-center" style="justify-content:space-between;align-items:center;">
-      <h2 style="margin:0;">Hola, ${user.nombre}</h2>
+      <div>
+        <h2 style="margin:0;">Hola, ${user.displayName || user.email}</h2>
+        <div style="font-size:0.95em;color:#888;">${user.email}</div>
+      </div>
       <button style="background:#eee;color:#222;padding:0.5em 1em;font-size:0.9em;" id="logout-btn">Salir</button>
     </div>
     <div class="mt-2">
-      <button id="new-revip">+ Nuevo proyecto REVIP</button>
+      <button id="new-revip">Nuevo proyecto REVIP</button>
       <button id="upload-revip" style="margin-left:0.5em;">Subir proyecto REVIP</button>
       <input type="file" id="upload-revip-file" accept="application/json" style="display:none;" />
       <div id="projects-list" class="mt-2"></div>
@@ -48,20 +98,16 @@ function renderDashboard() {
   document.getElementById('upload-revip').onclick = () => {
     document.getElementById('upload-revip-file').click();
   };
-  document.getElementById('upload-revip-file').onchange = (e) => {
+  document.getElementById('upload-revip-file').onchange = async (e) => {
     const file = e.target.files[0];
     if (!file) return;
     const reader = new FileReader();
-    reader.onload = function(evt) {
+    reader.onload = async function(evt) {
       try {
         const data = JSON.parse(evt.target.result);
         if (!data || typeof data !== 'object' || !data.metadata) throw new Error('No es un proyecto REVIP válido');
-        // Assign new id if needed
-        data.id = 'revip-' + Date.now();
         data.lastModified = Date.now();
-        let projects = JSON.parse(localStorage.getItem('revip_projects') || '[]');
-        projects.push(data);
-        localStorage.setItem('revip_projects', JSON.stringify(projects));
+        await saveProject(data);
         renderProjectsList();
         alert('Proyecto REVIP subido correctamente.');
       } catch (err) {
@@ -69,14 +115,14 @@ function renderDashboard() {
       }
     };
     reader.readAsText(file);
-    // Reset file input
     e.target.value = '';
   };
   renderProjectsList();
 }
 
-function renderProjectsList() {
-  const projects = JSON.parse(localStorage.getItem('revip_projects') || '[]');
+// --- Projects List ---
+async function renderProjectsList() {
+  const projects = await getProjects();
   const list = document.getElementById('projects-list');
   if (!projects.length) {
     list.innerHTML = '<p style="color:#888;">No hay proyectos aún.</p>';
@@ -154,8 +200,8 @@ function startBuilder(existingProject) {
     subescalas: [],
     dimensiones: [
       { nombre: 'Claridad', izq: 'Confuso', der: 'Claro', header: '¿Qué tan clara le parece la redacción del ítem?', puntos: 5 },
-      { nombre: 'Relevancia', izq: 'Irrelevante', der: 'Relevante', header: '¿Qué tan relevante le parece este ítem para la medición de la escala?', puntos: 5 },
-      { nombre: 'Pertinencia', izq: 'Impertinente', der: 'Pertinente', header: '¿Qué tan pertinente es el ítem para la medición de la escala?', puntos: 5 }
+      { nombre: 'Relevancia', izq: 'Irrelevante', der: 'Relevante', header: '¿Qué tan relevante le parece este ítem?', puntos: 5 },
+      { nombre: 'Pertinencia', izq: 'Impertinente', der: 'Pertinente', header: '¿Qué tan pertinente es el ítem?', puntos: 5 }
     ],
     lastModified: Date.now(),
   };
@@ -550,8 +596,11 @@ function renderJudgeView(project) {
 }
 
 // Entry point
-if (getUser()) {
-  renderDashboard();
-} else {
-  renderLogin();
-} 
+auth.onAuthStateChanged(user => {
+  currentUser = user;
+  if (user) {
+    renderDashboard();
+  } else {
+    renderLogin();
+  }
+}); 
