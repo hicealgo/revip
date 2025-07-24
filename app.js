@@ -146,6 +146,7 @@ async function renderProjectsList() {
         <div>
           <strong>${p.metadata.nombre || 'Sin nombre'}</strong><br>
           <small>${p.metadata.autor || ''}</small>
+          <div style="font-size:0.95em;color:#888;">Respuestas: <span id="resp-count-${p.id}">...</span></div>
         </div>
         <div class="flex flex-center" style="gap:0.3em;">
           <button class="icon-btn" title="Editar" onclick="window.editProject('${p.id}')">
@@ -160,6 +161,9 @@ async function renderProjectsList() {
           <button class="icon-btn" title="Compartir" onclick="window.shareProject('${p.id}')">
             ${icons.share}<span class="tooltip">Compartir</span>
           </button>
+          <button class="icon-btn" title="Ver respuestas" onclick="window.viewResponses('${p.id}')">
+            <svg xmlns='http://www.w3.org/2000/svg' width='16' height='16' fill='currentColor' class='bi bi-table' viewBox='0 0 16 16'><path d='M0 3a2 2 0 0 1 2-2h12a2 2 0 0 1 2 2v10a2 2 0 0 1-2 2H2a2 2 0 0 1-2-2V3zm2-1a1 1 0 0 0-1 1v2h14V3a1 1 0 0 0-1-1H2zm13 4H1v7a1 1 0 0 0 1 1h12a1 1 0 0 0 1-1V6z'/></svg><span class="tooltip">Ver respuestas</span>
+          </button>
           <button class="icon-btn" title="Eliminar" onclick="window.deleteProjectUI('${p.id}')">
             ${icons.trash}<span class="tooltip">Eliminar</span>
           </button>
@@ -170,6 +174,11 @@ async function renderProjectsList() {
       </div>
     </div>
   `).join('');
+  // Fetch and show response counts
+  projects.forEach(async p => {
+    const snap = await db.collection('users').doc(currentUser.uid).collection('projects').doc(p.id).collection('responses').get();
+    document.getElementById(`resp-count-${p.id}`).textContent = snap.size;
+  });
 }
 
 window.editProject = async function(id) {
@@ -184,7 +193,7 @@ window.previewProject = async function(id) {
   const projects = await getProjects();
   const project = projects.find(p => p.id === id);
   if (project) {
-    renderJudgeView(project);
+    renderJudgeView(project, true);
   }
 };
 
@@ -202,8 +211,96 @@ window.downloadProject = async function(id) {
   }
 };
 
-window.shareProject = function(id) {
-  alert('Funcionalidad de compartir próximamente.');
+window.shareProject = async function(id) {
+  // Detect base path for local or GitHub Pages
+  let base = window.location.origin + window.location.pathname;
+  if (base.endsWith('/')) base = base.slice(0, -1);
+  let publicPath = base.includes('/revip') ? base.replace(/\/[^/]*$/, '') + '/public.html' : window.location.origin + '/public.html';
+  const url = new URL(publicPath);
+  url.searchParams.set('userId', currentUser.uid);
+  url.searchParams.set('projectId', id);
+  // Prompt for prefill?
+  const nombre = prompt('¿Prefieres prellenar el nombre del juez? (opcional)');
+  if (nombre) url.searchParams.set('nombre', nombre);
+  const correo = nombre ? prompt('¿Prefieres prellenar el correo del juez? (opcional)') : '';
+  if (correo) url.searchParams.set('correo', correo);
+  // Show modal with link and copy button
+  let html = `<div class='judge-card'><h3>Link para jueces</h3><input type='text' id='share-link' value='${url.toString()}' readonly style='width:100%;font-size:1em;margin-bottom:1em;' /><button id='copy-link'>Copiar link</button><div style='text-align:right;margin-top:1.5em;'><button id='close-share'>Cerrar</button></div></div>`;
+  const modal = document.createElement('div');
+  modal.style.position = 'fixed';
+  modal.style.top = '0';
+  modal.style.left = '0';
+  modal.style.width = '100vw';
+  modal.style.height = '100vh';
+  modal.style.background = 'rgba(0,0,0,0.15)';
+  modal.style.zIndex = '9999';
+  modal.innerHTML = `<div style='max-width:520px;margin:3em auto;'>${html}</div>`;
+  document.body.appendChild(modal);
+  document.getElementById('close-share').onclick = () => document.body.removeChild(modal);
+  document.getElementById('copy-link').onclick = async () => {
+    try {
+      await navigator.clipboard.writeText(url.toString());
+      alert('¡Link copiado al portapapeles!');
+    } catch {
+      alert('No se pudo copiar automáticamente. Selecciona y copia el link.');
+    }
+  };
+};
+
+window.viewResponses = async function(id) {
+  // Fetch responses
+  const snap = await db.collection('users').doc(currentUser.uid).collection('projects').doc(id).collection('responses').get();
+  const responses = snap.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+  // Show modal/page
+  let html = `<div class='judge-card'><h3>Respuestas recibidas: ${responses.length}</h3>`;
+  if (!responses.length) {
+    html += '<p style="color:#888;">Aún no hay respuestas.</p>';
+  } else {
+    html += `<button id='download-csv'>Descargar CSV</button><div style='overflow-x:auto;'><table border='1' cellpadding='4' style='width:100%;margin-top:1em;font-size:0.95em;'><thead><tr><th>Fecha</th><th>Juez</th><th>Correo</th><th>Obs. generales</th></tr></thead><tbody>`;
+    responses.forEach(r => {
+      html += `<tr><td>${r.submittedAt ? new Date(r.submittedAt).toLocaleString('es-CL') : ''}</td><td>${r.judge?.nombre || ''}</td><td>${r.judge?.correo || ''}</td><td>${r.generalObs || ''}</td></tr>`;
+    });
+    html += '</tbody></table></div>';
+  }
+  html += `<div style='text-align:right;margin-top:1.5em;'><button id='close-resp'>Cerrar</button></div></div>`;
+  // Show as modal (simple)
+  const modal = document.createElement('div');
+  modal.style.position = 'fixed';
+  modal.style.top = '0';
+  modal.style.left = '0';
+  modal.style.width = '100vw';
+  modal.style.height = '100vh';
+  modal.style.background = 'rgba(0,0,0,0.15)';
+  modal.style.zIndex = '9999';
+  modal.innerHTML = `<div style='max-width:520px;margin:3em auto;'>${html}</div>`;
+  document.body.appendChild(modal);
+  document.getElementById('close-resp').onclick = () => document.body.removeChild(modal);
+  if (responses.length) {
+    document.getElementById('download-csv').onclick = () => {
+      const csv = [
+        ['Fecha','Juez','Correo','Obs. generales',...responses[0].dimensiones.map(d=>`D:${d}`),...responses[0].items.map((it,i)=>`Item${i+1}: ${it.item}`)]
+      ];
+      responses.forEach(r => {
+        const row = [
+          r.submittedAt || '',
+          r.judge?.nombre || '',
+          r.judge?.correo || '',
+          r.generalObs || '',
+          ...(r.ratings?.[0]?.map((_,d)=>r.ratings.map(rat=>rat[d]).join('|')) || []),
+          ...(r.comments || [])
+        ];
+        csv.push(row);
+      });
+      const csvStr = csv.map(row => row.map(val => '"'+String(val).replace(/"/g,'""')+'"').join(',')).join('\n');
+      const blob = new Blob([csvStr], {type:'text/csv'});
+      const a = document.createElement('a');
+      a.href = URL.createObjectURL(blob);
+      a.download = 'respuestas-revip.csv';
+      document.body.appendChild(a);
+      a.click();
+      a.remove();
+    };
+  }
 };
 
 window.deleteProjectUI = async function(id) {
@@ -426,7 +523,7 @@ function startBuilder(existingProject) {
   }
 }
 
-function renderJudgeView(project) {
+function renderJudgeView(project, previewMode = false) {
   // Build slides: welcome, items, general obs, thank you
   let subescalas = project.subescalas;
   let dimensiones = project.dimensiones;
@@ -450,6 +547,7 @@ function renderJudgeView(project) {
   let generalObs = '';
   let itemRatings = Array(items.length).fill(null).map(() => dimensiones.map(() => null));
   let itemComments = Array(items.length).fill('');
+  let judge = { nombre: '', correo: '' };
   renderSlide();
 
   function renderProgressBar() {
@@ -485,6 +583,12 @@ function renderJudgeView(project) {
     if (slide === 0) {
       // Calculate total items correctly
       let totalItems = project.subescalas.reduce((sum, s) => sum + (s.items ? s.items.split('\n').filter(Boolean).length : 0), 0);
+      let judgeFields = previewMode ? `
+        <div style="margin:1em 0 0.5em 0;">
+          <label>Nombre del juez:<br><input type="text" id="judge-nombre" value="${judge.nombre}" placeholder="Nombre" /></label><br>
+          <label>Email del juez:<br><input type="email" id="judge-correo" value="${judge.correo}" placeholder="Correo" /></label>
+        </div>
+      ` : '';
       renderJudgeArea(`
         <div style="text-align:justify;">
           Bienvenido. Ha sido invitado/a como experto/a para evaluar el planteamiento del instrumento <b>${project.metadata.nombre || ''}</b>.<br><br>
@@ -493,10 +597,15 @@ function renderJudgeView(project) {
           <span style="display:block;text-align:left;margin-bottom:0.2em;">Contacto: ${project.metadata.email || ''}</span>
           ${project.metadata.instrucciones ? `<span style=\"display:block;text-align:left;margin-bottom:0.2em;\">${project.metadata.instrucciones}</span>` : ''}
           <br>
+          ${judgeFields}
           El instrumento consta de <b>${totalItems}</b> ítems organizados en <b>${project.subescalas.length > 1 ? project.subescalas.length + ' subescalas' : '1 escala'}</b>. Le pedimos que considere cada ítem en el contexto del objetivo de medición del instrumento, y que los pueda evaluar indicando el grado de <b>${joinDims(project.dimensiones.map(d=>d.nombre))}</b> para cada uno. Para proceder con la evaluación, presione continuar.
           <div style="text-align:center;margin-top:1.5em;"><button id="next-slide">Continuar</button></div>
         </div>
       `);
+      if (previewMode) {
+        document.getElementById('judge-nombre').oninput = e => { judge.nombre = e.target.value; };
+        document.getElementById('judge-correo').oninput = e => { judge.correo = e.target.value; };
+      }
       document.getElementById('next-slide').onclick = () => { slide = 1; renderSlide(); };
       return;
     }
