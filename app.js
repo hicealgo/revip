@@ -61,16 +61,18 @@ async function saveProject(project) {
   if (project.id) {
     await ref.doc(project.id).set(project);
   } else {
-    const doc = await ref.add(project);
+    // Don't include id field when adding
+    const { id, ...dataWithoutId } = project;
+    const doc = await ref.add(dataWithoutId);
+    // Now update the doc with the generated id
+    await ref.doc(doc.id).update({ id: doc.id });
     project.id = doc.id;
   }
 }
+// Firestore deleteProject: only deletes, no confirm or UI
 async function deleteProject(id) {
   if (!currentUser) return;
-  if (confirm('¿Seguro que desea eliminar este proyecto?')) {
-    await db.collection('users').doc(currentUser.uid).collection('projects').doc(id).delete();
-    renderProjectsList();
-  }
+  await db.collection('users').doc(currentUser.uid).collection('projects').doc(id).delete();
 }
 
 // --- Dashboard ---
@@ -158,7 +160,7 @@ async function renderProjectsList() {
           <button class="icon-btn" title="Compartir" onclick="window.shareProject('${p.id}')">
             ${icons.share}<span class="tooltip">Compartir</span>
           </button>
-          <button class="icon-btn" title="Eliminar" onclick="window.deleteProject('${p.id}')">
+          <button class="icon-btn" title="Eliminar" onclick="window.deleteProjectUI('${p.id}')">
             ${icons.trash}<span class="tooltip">Eliminar</span>
           </button>
         </div>
@@ -204,15 +206,22 @@ window.shareProject = function(id) {
   alert('Funcionalidad de compartir próximamente.');
 };
 
-window.deleteProject = async function(id) {
-  await deleteProject(id);
+window.deleteProjectUI = async function(id) {
+  try {
+    if (confirm('¿Seguro que desea eliminar este proyecto?')) {
+      await deleteProject(id);
+      await renderProjectsList();
+    }
+  } catch (err) {
+    alert('Error al eliminar el proyecto: ' + (err.message || err));
+  }
 };
 
 function startBuilder(existingProject) {
   let step = 1;
   let isEdit = !!existingProject;
   let project = existingProject ? JSON.parse(JSON.stringify(existingProject)) : {
-    id: existingProject ? existingProject.id : undefined,
+    // Do not set id for new projects
     metadata: { nombre: '', autor: '', email: '', descripcion: '', idioma: 'es', poblacion: '', subescalas: 1, instrucciones: '' },
     subescalas: [],
     dimensiones: [
