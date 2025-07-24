@@ -1,0 +1,260 @@
+:root {
+  --primary: #2C0E37;
+  --accent: #f6ad55;
+  --bg: #f9fafb;
+  --text: #222;
+  --border: #e2e8f0;
+  --radius: 12px;
+  --shadow: 0 2px 8px rgba(0,0,0,0.04);
+}
+
+body {
+  margin: 0;
+  padding: 0;
+  font-family: 'Inter', Arial, sans-serif;
+  background: var(--bg);
+  color: var(--text);
+  min-height: 100vh;
+}
+
+#app {
+  max-width: 480px;
+  margin: 0 auto;
+  padding: 2rem 1rem 4rem 1rem;
+}
+
+button, input, textarea, select {
+  font-family: inherit;
+  font-size: 1rem;
+}
+
+button {
+  background: var(--primary);
+  color: #fff;
+  border: none;
+  border-radius: var(--radius);
+  padding: 0.75em 1.5em;
+  margin: 0.5em 0;
+  cursor: pointer;
+  box-shadow: var(--shadow);
+  transition: background 0.2s, box-shadow 0.2s;
+}
+button:hover {
+  background: #22577a;
+  box-shadow: 0 4px 16px rgba(43,108,176,0.08);
+}
+
+input, textarea, select {
+  width: 100%;
+  padding: 0.75em;
+  margin: 0.5em 0 1em 0;
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  background: #fff;
+  box-sizing: border-box;
+  resize: vertical;
+}
+
+.card {
+  background: #fff;
+  border-radius: var(--radius);
+  box-shadow: var(--shadow);
+  padding: 1.5em;
+  margin-bottom: 1.5em;
+  border: 1px solid var(--border);
+}
+
+h1, h2, h3 {
+  font-weight: 700;
+  margin: 0.5em 0 0.25em 0;
+}
+
+label {
+  font-weight: 500;
+  margin-bottom: 0.25em;
+  display: block;
+}
+
+/* Utilidades */
+.flex {
+  display: flex;
+  gap: 1em;
+}
+.flex-col {
+  flex-direction: column;
+}
+.flex-center {
+  align-items: center;
+  justify-content: center;
+}
+.text-center {
+  text-align: center;
+}
+.mt-2 {
+  margin-top: 2em;
+}
+
+.icon-btn {
+  background: #fff;
+  border: 1px solid var(--border);
+  padding: 0.35em;
+  border-radius: 50%;
+  cursor: pointer;
+  font-size: 1.1em;
+  color: var(--primary);
+  transition: background 0.2s, color 0.2s, border 0.2s;
+  position: relative;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 2.2em;
+  height: 2.2em;
+}
+.icon-btn:hover {
+  background: #e2e8f0;
+  color: #22577a;
+  border-color: #b5bfc9;
+}
+.icon-btn svg {
+  width: 1.2em;
+  height: 1.2em;
+  display: block;
+  fill: currentColor;
+}
+.icon-btn .tooltip {
+  visibility: hidden;
+  opacity: 0;
+  background: #222;
+  color: #fff;
+  text-align: center;
+  border-radius: 6px;
+  padding: 0.3em 0.7em;
+  position: absolute;
+  z-index: 1;
+  bottom: 120%;
+  left: 50%;
+  transform: translateX(-50%);
+  font-size: 0.85em;
+  white-space: nowrap;
+  pointer-events: none;
+  transition: opacity 0.2s;
+}
+.icon-btn:hover .tooltip {
+  visibility: visible;
+  opacity: 1;
+} 
+
+.judge-container {
+  max-width: 480px;
+  margin: 0 auto;
+  padding: 0;
+  background: none;
+}
+
+.progress-bar {
+  width: 100%;
+  height: 8px;
+  background: #e2e8f0;
+  border-radius: 6px;
+  margin: 1.2em 0 1.5em 0;
+  overflow: hidden;
+}
+.progress-bar-inner {
+  height: 100%;
+  background: var(--primary);
+  border-radius: 6px;
+  transition: width 0.3s;
+}
+
+.semantic-scale {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.5em;
+  margin: 0.5em 0 1em 0;
+}
+.semantic-scale > span {
+  display: flex;
+  align-items: center;
+  height: 1.3em;
+  font-size: 0.95em;
+  color: #888;
+}
+
+.semantic-radio {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  cursor: pointer;
+  margin: 0 0.2em;
+  min-width: 1.7em;
+  justify-content: center;
+}
+.semantic-radio input[type="radio"] {
+  display: none;
+}
+.semantic-radio .circle {
+  width: 1.3em;
+  height: 1.3em;
+  border-radius: 50%;
+  border: 2px solid #b5bfc9;
+  background: #fff;
+  transition: border 0.2s, box-shadow 0.2s;
+  box-shadow: 0 1px 2px rgba(0,0,0,0.04);
+  box-sizing: border-box;
+}
+.semantic-radio.selected .circle {
+  border: 2.5px solid var(--primary);
+  background: var(--primary);
+  box-shadow: 0 2px 8px rgba(43,108,176,0.08);
+}
+.semantic-radio .label {
+  font-size: 0.85em;
+  color: #888;
+  margin-top: 0.2em;
+  min-height: 1em;
+}
+
+input[type="text"].item-comment {
+  width: 100%;
+  margin: 0.5em 0 1em 0;
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  padding: 0.5em;
+  font-size: 1em;
+  box-sizing: border-box;
+} 
+
+.judge-card {
+  min-height: 340px;
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  padding: 1.5em;
+  background: #f6f8fa;
+  border-radius: var(--radius);
+  box-shadow: var(--shadow);
+  border: 1px solid var(--border);
+  margin-bottom: 1.5em;
+} 
+
+.judge-item-text {
+  font-size: 1.3em;
+  font-weight: 700;
+  margin: 0.7em 0;
+  text-align: center;
+}
+
+.judge-dim-header {
+  text-align: center;
+  font-size: 1em;
+  color: #444;
+  margin-bottom: 0.2em;
+}
+
+.tipo-desc {
+  font-size: 0.92em;
+  font-style: italic;
+  color: #888;
+  margin-left: 0;
+} 
