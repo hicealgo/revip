@@ -146,19 +146,19 @@ async function renderProjectsList() {
           <small>${p.metadata.autor || ''}</small>
         </div>
         <div class="flex flex-center" style="gap:0.3em;">
-          <button class="icon-btn" title="Editar" onclick="editProject('${p.id}')">
+          <button class="icon-btn" title="Editar" onclick="window.editProject('${p.id}')">
             ${icons.edit}<span class="tooltip">Editar</span>
           </button>
-          <button class="icon-btn" title="Vista previa" onclick="previewProject('${p.id}')">
+          <button class="icon-btn" title="Vista previa" onclick="window.previewProject('${p.id}')">
             ${icons.eye}<span class="tooltip">Vista previa</span>
           </button>
-          <button class="icon-btn" title="Descargar REVIP" onclick="downloadProject('${p.id}')">
+          <button class="icon-btn" title="Descargar REVIP" onclick="window.downloadProject('${p.id}')">
             ${icons.download}<span class="tooltip">Descargar</span>
           </button>
-          <button class="icon-btn" title="Compartir" onclick="shareProject('${p.id}')">
+          <button class="icon-btn" title="Compartir" onclick="window.shareProject('${p.id}')">
             ${icons.share}<span class="tooltip">Compartir</span>
           </button>
-          <button class="icon-btn" title="Eliminar" onclick="deleteProject('${p.id}')">
+          <button class="icon-btn" title="Eliminar" onclick="window.deleteProject('${p.id}')">
             ${icons.trash}<span class="tooltip">Eliminar</span>
           </button>
         </div>
@@ -170,32 +170,49 @@ async function renderProjectsList() {
   `).join('');
 }
 
-window.editProject = editProject;
-window.previewProject = previewProject;
-window.downloadProject = downloadProject;
-window.shareProject = shareProject;
-window.deleteProject = function(id) {
-  if (confirm('¿Seguro que desea eliminar este proyecto?')) {
-    let projects = JSON.parse(localStorage.getItem('revip_projects') || '[]');
-    projects = projects.filter(p => p.id !== id);
-    localStorage.setItem('revip_projects', JSON.stringify(projects));
-    renderProjectsList();
-  }
-};
-
-function editProject(id) {
-  const projects = JSON.parse(localStorage.getItem('revip_projects') || '[]');
+window.editProject = async function(id) {
+  const projects = await getProjects();
   const project = projects.find(p => p.id === id);
   if (project) {
     startBuilder(project);
   }
-}
+};
+
+window.previewProject = async function(id) {
+  const projects = await getProjects();
+  const project = projects.find(p => p.id === id);
+  if (project) {
+    renderJudgeView(project);
+  }
+};
+
+window.downloadProject = async function(id) {
+  const projects = await getProjects();
+  const project = projects.find(p => p.id === id);
+  if (project) {
+    const dataStr = "data:text/json;charset=utf-8," + encodeURIComponent(JSON.stringify(project, null, 2));
+    const dlAnchor = document.createElement('a');
+    dlAnchor.setAttribute("href", dataStr);
+    dlAnchor.setAttribute("download", `${project.metadata.nombre || 'revip'}.json`);
+    document.body.appendChild(dlAnchor);
+    dlAnchor.click();
+    dlAnchor.remove();
+  }
+};
+
+window.shareProject = function(id) {
+  alert('Funcionalidad de compartir próximamente.');
+};
+
+window.deleteProject = async function(id) {
+  await deleteProject(id);
+};
 
 function startBuilder(existingProject) {
   let step = 1;
   let isEdit = !!existingProject;
   let project = existingProject ? JSON.parse(JSON.stringify(existingProject)) : {
-    id: existingProject ? existingProject.id : 'revip-' + Date.now(),
+    id: existingProject ? existingProject.id : undefined,
     metadata: { nombre: '', autor: '', email: '', descripcion: '', idioma: 'es', poblacion: '', subescalas: 1, instrucciones: '' },
     subescalas: [],
     dimensiones: [
@@ -234,7 +251,7 @@ function startBuilder(existingProject) {
     document.getElementById('cancelar').onclick = renderDashboard;
     if (step > 1) document.getElementById('prev').onclick = () => { step--; renderStep(); };
     if (step < 4) document.getElementById('next').onclick = () => { if (validateStep()) { step++; renderStep(); } };
-    if (step === 4) document.getElementById('guardar').onclick = saveProject;
+    if (step === 4) document.getElementById('guardar').onclick = saveProjectBuilder;
   }
 
   function renderMetadatos() {
@@ -393,41 +410,11 @@ function startBuilder(existingProject) {
     return true;
   }
 
-  function saveProject() {
+  async function saveProjectBuilder() {
     project.lastModified = Date.now();
-    let projects = JSON.parse(localStorage.getItem('revip_projects') || '[]');
-    const idx = projects.findIndex(p => p.id === project.id);
-    if (idx >= 0) projects[idx] = project;
-    else projects.push(project);
-    localStorage.setItem('revip_projects', JSON.stringify(projects));
+    await saveProject(project);
     renderDashboard();
   }
-}
-
-function previewProject(id) {
-  const projects = JSON.parse(localStorage.getItem('revip_projects') || '[]');
-  const project = projects.find(p => p.id === id);
-  if (project) {
-    renderJudgeView(project);
-  }
-}
-
-function downloadProject(id) {
-  const projects = JSON.parse(localStorage.getItem('revip_projects') || '[]');
-  const project = projects.find(p => p.id === id);
-  if (project) {
-    const dataStr = "data:text/json;charset=utf-8," + encodeURIComponent(JSON.stringify(project, null, 2));
-    const dlAnchor = document.createElement('a');
-    dlAnchor.setAttribute("href", dataStr);
-    dlAnchor.setAttribute("download", `${project.metadata.nombre || 'revip'}.json`);
-    document.body.appendChild(dlAnchor);
-    dlAnchor.click();
-    dlAnchor.remove();
-  }
-}
-
-function shareProject(id) {
-  alert('Funcionalidad de compartir próximamente.');
 }
 
 function renderJudgeView(project) {
