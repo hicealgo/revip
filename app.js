@@ -36,12 +36,41 @@ function renderDashboard() {
     </div>
     <div class="mt-2">
       <button id="new-revip">+ Nuevo proyecto REVIP</button>
+      <button id="upload-revip" style="margin-left:0.5em;">Subir proyecto REVIP</button>
+      <input type="file" id="upload-revip-file" accept="application/json" style="display:none;" />
       <div id="projects-list" class="mt-2"></div>
     </div>
   `;
   document.getElementById('logout-btn').onclick = logout;
   document.getElementById('new-revip').onclick = () => {
     startBuilder();
+  };
+  document.getElementById('upload-revip').onclick = () => {
+    document.getElementById('upload-revip-file').click();
+  };
+  document.getElementById('upload-revip-file').onchange = (e) => {
+    const file = e.target.files[0];
+    if (!file) return;
+    const reader = new FileReader();
+    reader.onload = function(evt) {
+      try {
+        const data = JSON.parse(evt.target.result);
+        if (!data || typeof data !== 'object' || !data.metadata) throw new Error('No es un proyecto REVIP válido');
+        // Assign new id if needed
+        data.id = 'revip-' + Date.now();
+        data.lastModified = Date.now();
+        let projects = JSON.parse(localStorage.getItem('revip_projects') || '[]');
+        projects.push(data);
+        localStorage.setItem('revip_projects', JSON.stringify(projects));
+        renderProjectsList();
+        alert('Proyecto REVIP subido correctamente.');
+      } catch (err) {
+        alert('Error al subir el proyecto: ' + err.message);
+      }
+    };
+    reader.readAsText(file);
+    // Reset file input
+    e.target.value = '';
   };
   renderProjectsList();
 }
