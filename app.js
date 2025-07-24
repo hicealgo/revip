@@ -149,23 +149,26 @@ async function renderProjectsList() {
           <div style="font-size:0.95em;color:#888;">Respuestas: <span id="resp-count-${p.id}">...</span></div>
         </div>
         <div class="flex flex-center" style="gap:0.3em;">
-          <button class="icon-btn" title="Editar" onclick="window.editProject('${p.id}')">
+          <button class="icon-btn edit-btn" title="Editar" onclick="window.editProject('${p.id}')">
             ${icons.edit}<span class="tooltip">Editar</span>
           </button>
-          <button class="icon-btn" title="Vista previa" onclick="window.previewProject('${p.id}')">
-            ${icons.eye}<span class="tooltip">Vista previa</span>
-          </button>
-          <button class="icon-btn" title="Descargar REVIP" onclick="window.downloadProject('${p.id}')">
+          <button class="icon-btn download-btn" title="Descargar REVIP" onclick="window.downloadProject('${p.id}')">
             ${icons.download}<span class="tooltip">Descargar</span>
           </button>
-          <button class="icon-btn" title="Compartir" onclick="window.shareProject('${p.id}')">
+          <button class="icon-btn preview-btn" title="Vista previa" onclick="window.previewProject('${p.id}')">
+            ${icons.eye}<span class="tooltip">Vista previa</span>
+          </button>
+          <button class="icon-btn delete-btn" title="Eliminar" onclick="window.deleteProjectUI('${p.id}')">
+            ${icons.trash}<span class="tooltip">Eliminar</span>
+          </button>
+          <button class="icon-btn send-btn" title="Enviar" onclick="window.shareProject('${p.id}')">
             ${icons.share}<span class="tooltip">Compartir</span>
           </button>
-          <button class="icon-btn" title="Ver respuestas" onclick="window.viewResponses('${p.id}')">
+          <button class="icon-btn view-results-btn" title="Ver respuestas" data-id='${p.id}'>
             <svg xmlns='http://www.w3.org/2000/svg' width='16' height='16' fill='currentColor' class='bi bi-table' viewBox='0 0 16 16'><path d='M0 3a2 2 0 0 1 2-2h12a2 2 0 0 1 2 2v10a2 2 0 0 1-2 2H2a2 2 0 0 1-2-2V3zm2-1a1 1 0 0 0-1 1v2h14V3a1 1 0 0 0-1-1H2zm13 4H1v7a1 1 0 0 0 1 1h12a1 1 0 0 0 1-1V6z'/></svg><span class="tooltip">Ver respuestas</span>
           </button>
-          <button class="icon-btn" title="Eliminar" onclick="window.deleteProjectUI('${p.id}')">
-            ${icons.trash}<span class="tooltip">Eliminar</span>
+          <button class="icon-btn analysis-btn" title="Análisis" data-id='${p.id}'>
+            <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" fill="currentColor" class="bi bi-file-bar-graph-fill" viewBox="0 0 16 16"><path d="M12 0H4a2 2 0 0 0-2 2v12a2 2 0 0 0 2 2h8a2 2 0 0 0 2-2V2a2 2 0 0 0-2-2m-2 11.5v-6a.5.5 0 0 1 .5-.5h1a.5.5 0 0 1 .5.5v6a.5.5 0 0 1-.5.5h-1a.5.5 0 0 1-.5-.5m-2.5.5a.5.5 0 0 1-.5-.5v-4a.5.5 0 0 1 .5-.5h1a.5.5 0 0 1 .5.5v4a.5.5 0 0 1-.5.5zm-3 0a.5.5 0 0 1-.5-.5v-2a.5.5 0 0 1 .5-.5h1a.5.5 0 0 1 .5.5v2a.5.5 0 0 1-.5.5z"/></svg><span class="tooltip">Análisis</span>
           </button>
         </div>
       </div>
@@ -178,6 +181,62 @@ async function renderProjectsList() {
   projects.forEach(async p => {
     const snap = await db.collection('users').doc(currentUser.uid).collection('projects').doc(p.id).collection('responses').get();
     document.getElementById(`resp-count-${p.id}`).textContent = snap.size;
+  });
+
+  // Attach event listeners to new buttons
+  document.querySelectorAll('.view-results-btn').forEach(btn => {
+    btn.onclick = async () => {
+      const id = btn.getAttribute('data-id');
+      window.viewResponses(id);
+    };
+  });
+  document.querySelectorAll('.analysis-btn').forEach(btn => {
+    btn.onclick = async () => {
+      const id = btn.getAttribute('data-id');
+      // Fetch responses
+      const snap = await db.collection('users').doc(currentUser.uid).collection('projects').doc(id).collection('responses').get();
+      const responses = snap.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+      if (!responses.length) {
+        alert('Aún no hay respuestas para este proyecto.');
+        return;
+      }
+      const dims = responses[0].dimensiones || [];
+      const items = responses[0].items || [];
+      // Promedios por item y dimensión
+      const stats = items.map((item, i) => {
+        const vals = dims.map(dim => {
+          const arr = responses.map(r => Number(r.ratings?.[i]?.[dim]) || 0).filter(x=>x>0);
+          const avg = arr.length ? arr.reduce((a,b)=>a+b,0)/arr.length : 0;
+          return {dim, avg, n: arr.length};
+        });
+        return {item: item.item, idx: i, vals, comments: responses.map(r=>r.comments?.[i]).filter(Boolean)};
+      });
+      // Modal HTML
+      let html = `<div class='judge-card'><h3>Análisis por ítem</h3><div style='overflow-x:auto;'><table border='1' cellpadding='4' style='width:100%;font-size:0.95em;'><thead><tr><th>Ítem</th>`;
+      dims.forEach(d => { html += `<th>${d}</th>`; });
+      html += `<th>N respuestas</th><th>Comentarios</th></tr></thead><tbody>`;
+      stats.forEach(s => {
+        html += `<tr${s.vals.some(v=>v.avg<3)?' style="background:#fee;"':''}><td>${s.item}</td>`;
+        s.vals.forEach(v => {
+          html += `<td>${v.avg.toFixed(2)}</td>`;
+        });
+        html += `<td>${s.vals[0].n}</td><td>${s.comments.map(c=>`<div style='margin-bottom:0.5em;'>${c}</div>`).join('')}</td></tr>`;
+      });
+      html += `</tbody></table></div>`;
+      html += `<div style='text-align:right;margin-top:1.5em;'><button id='close-analysis'>Cerrar</button></div></div>`;
+      // Show as modal
+      const modal = document.createElement('div');
+      modal.style.position = 'fixed';
+      modal.style.top = '0';
+      modal.style.left = '0';
+      modal.style.width = '100vw';
+      modal.style.height = '100vh';
+      modal.style.background = 'rgba(0,0,0,0.15)';
+      modal.style.zIndex = '9999';
+      modal.innerHTML = `<div style='max-width:700px;margin:3em auto;background:#fff;padding:2em;border-radius:1em;'>${html}</div>`;
+      document.body.appendChild(modal);
+      document.getElementById('close-analysis').onclick = () => document.body.removeChild(modal);
+    };
   });
 }
 
@@ -256,9 +315,9 @@ window.viewResponses = async function(id) {
   if (!responses.length) {
     html += '<p style="color:#888;">Aún no hay respuestas.</p>';
   } else {
-    html += `<button id='download-csv'>Descargar CSV</button><div style='overflow-x:auto;'><table border='1' cellpadding='4' style='width:100%;margin-top:1em;font-size:0.95em;'><thead><tr><th>Fecha</th><th>Juez</th><th>Correo</th><th>Obs. generales</th></tr></thead><tbody>`;
+    html += `<button id='download-csv'>Descargar CSV</button><div style='overflow-x:auto;'><table border='1' cellpadding='4' style='width:100%;margin-top:1em;font-size:0.95em;'><thead><tr><th>Fecha</th><th>Experto/a</th><th>Correo</th><th>Borrar</th></tr></thead><tbody>`;
     responses.forEach(r => {
-      html += `<tr><td>${r.submittedAt ? new Date(r.submittedAt).toLocaleString('es-CL') : ''}</td><td>${r.judge?.nombre || ''}</td><td>${r.judge?.correo || ''}</td><td>${r.generalObs || ''}</td></tr>`;
+      html += `<tr><td>${r.submittedAt ? new Date(r.submittedAt).toLocaleString('es-CL') : ''}</td><td>${r.experto?.nombre || ''}</td><td>${r.experto?.correo || ''}</td><td><button class='del-resp-btn' data-id='${r.id}' title='Borrar respuesta' style='color:#c00;background:none;border:none;font-size:1.2em;cursor:pointer;'>&#128465;</button></td></tr>`;
     });
     html += '</tbody></table></div>';
   }
@@ -277,17 +336,23 @@ window.viewResponses = async function(id) {
   document.getElementById('close-resp').onclick = () => document.body.removeChild(modal);
   if (responses.length) {
     document.getElementById('download-csv').onclick = () => {
+      // Flatten ratings for CSV
+      const dims = responses[0].dimensiones || [];
+      const items = responses[0].items || [];
       const csv = [
-        ['Fecha','Juez','Correo','Obs. generales',...responses[0].dimensiones.map(d=>`D:${d}`),...responses[0].items.map((it,i)=>`Item${i+1}: ${it.item}`)]
+        ['Fecha','Experto/a','Correo','Obs. generales',...dims.map(d=>`D:${d}`),...items.map((it,i)=>`Item${i+1}: ${it.item}`)]
       ];
       responses.forEach(r => {
+        // ratings: [{dim1: x, dim2: y, ...}, ...]
+        const dimVals = dims.map(d => r.ratings.map(rat => rat[d]).join('|'));
+        const itemVals = r.comments || [];
         const row = [
           r.submittedAt || '',
-          r.judge?.nombre || '',
-          r.judge?.correo || '',
+          r.experto?.nombre || '',
+          r.experto?.correo || '',
           r.generalObs || '',
-          ...(r.ratings?.[0]?.map((_,d)=>r.ratings.map(rat=>rat[d]).join('|')) || []),
-          ...(r.comments || [])
+          ...dimVals,
+          ...itemVals
         ];
         csv.push(row);
       });
@@ -585,8 +650,8 @@ function renderJudgeView(project, previewMode = false) {
       let totalItems = project.subescalas.reduce((sum, s) => sum + (s.items ? s.items.split('\n').filter(Boolean).length : 0), 0);
       let judgeFields = previewMode ? `
         <div style="margin:1em 0 0.5em 0;">
-          <label>Nombre del juez:<br><input type="text" id="judge-nombre" value="${judge.nombre}" placeholder="Nombre" /></label><br>
-          <label>Email del juez:<br><input type="email" id="judge-correo" value="${judge.correo}" placeholder="Correo" /></label>
+          <label>Nombre experto/a:<br><input type="text" id="judge-nombre" value="${judge.nombre}" placeholder="Nombre" /></label><br>
+          <label>Correo electrónico experto/a:<br><input type="email" id="judge-correo" value="${judge.correo}" placeholder="Correo" /></label>
         </div>
       ` : '';
       renderJudgeArea(`
@@ -595,10 +660,10 @@ function renderJudgeView(project, previewMode = false) {
           <span style="display:block;text-align:left;margin-bottom:0.2em;">Descripción: ${project.metadata.descripcion || ''}</span>
           <span style="display:block;text-align:left;margin-bottom:0.2em;">Investigadores: ${project.metadata.autor || ''}</span>
           <span style="display:block;text-align:left;margin-bottom:0.2em;">Contacto: ${project.metadata.email || ''}</span>
-          ${project.metadata.instrucciones ? `<span style=\"display:block;text-align:left;margin-bottom:0.2em;\">${project.metadata.instrucciones}</span>` : ''}
+          ${project.metadata.instrucciones ? `<span style="display:block;text-align:left;margin-bottom:0.2em;">${project.metadata.instrucciones}</span>` : ''}
           <br>
-          ${judgeFields}
           El instrumento consta de <b>${totalItems}</b> ítems organizados en <b>${project.subescalas.length > 1 ? project.subescalas.length + ' subescalas' : '1 escala'}</b>. Le pedimos que considere cada ítem en el contexto del objetivo de medición del instrumento, y que los pueda evaluar indicando el grado de <b>${joinDims(project.dimensiones.map(d=>d.nombre))}</b> para cada uno. Para proceder con la evaluación, presione continuar.
+          ${judgeFields}
           <div style="text-align:center;margin-top:1.5em;"><button id="next-slide">Continuar</button></div>
         </div>
       `);

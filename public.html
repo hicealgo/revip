@@ -115,24 +115,24 @@
     // --- Slides ---
     function renderSlide() {
       if (!project) return;
-      // 0: Welcome + datos juez
+      // 0: Welcome + datos experto/a
       if (slide === 0) {
         document.getElementById('app').innerHTML = `
           <div class="judge-container">
             <div class="judge-card">
               <div style="text-align:justify;">
-                <b>Bienvenido/a.</b> Usted ha sido invitado/a como juez experto/a para evaluar el instrumento <b>${project.metadata.nombre || ''}</b>.<br><br>
+                <b>Bienvenido/a.</b> Usted ha sido invitado/a como experto/a para evaluar el instrumento <b>${project.metadata.nombre || ''}</b>.<br><br>
                 <span style="display:block;text-align:left;margin-bottom:0.2em;">Descripción: ${project.metadata.descripcion || ''}</span>
                 <span style="display:block;text-align:left;margin-bottom:0.2em;">Investigadores: ${project.metadata.autor || ''}</span>
                 <span style="display:block;text-align:left;margin-bottom:0.2em;">Contacto: ${project.metadata.email || ''}</span>
                 ${project.metadata.instrucciones ? `<span style=\"display:block;text-align:left;margin-bottom:0.2em;\">${project.metadata.instrucciones}</span>` : ''}
                 <br>
-                <div style="margin:1em 0 0.5em 0;">
-                  <label>Nombre del juez:<br><input type="text" id="judge-nombre" value="${judge.nombre}" placeholder="Nombre" /></label><br>
-                  <label>Email del juez:<br><input type="email" id="judge-correo" value="${judge.correo}" placeholder="Correo" /></label>
-                </div>
                 <div style="margin-bottom:1.2em;">El instrumento consta de <b>${items.length}</b> ítems organizados en <b>${subescalas.length > 1 ? subescalas.length + ' subescalas' : '1 escala'}</b>. Le pedimos que considere cada ítem en el contexto del objetivo de medición del instrumento, y que los pueda evaluar indicando el grado de <b>${dimensiones.map(d=>d.nombre).join(', ')}</b> para cada uno. Para proceder con la evaluación, presione continuar.</div>
-                <div style="text-align:center;margin-top:1.5em;"><button id="next-slide">Comenzar evaluación</button></div>
+                <div style="margin:0 0 0.5em 0;">
+                  <label>Nombre experto/a:<br><input type="text" id="judge-nombre" value="${judge.nombre}" placeholder="Nombre" /></label>
+                  <label>Correo experto/a:<br><input type="email" id="judge-correo" value="${judge.correo}" placeholder="Correo" /></label>
+                </div>
+                <div style="text-align:center;margin-top:1.5em;"><button id="next-slide">Continuar</button></div>
               </div>
             </div>
           </div>
@@ -246,10 +246,15 @@
         return;
       }
       // Save response
+      const ratings = items.map((it, i) => {
+        const obj = {};
+        dimensiones.forEach((d, dIdx) => { obj[d.nombre] = itemRatings[i][dIdx]; });
+        return obj;
+      });
       const response = {
-        judge: { ...judge },
+        experto: { ...judge },
         submittedAt: new Date().toISOString(),
-        ratings: itemRatings,
+        ratings,
         comments: itemComments,
         generalObs,
         items: items.map(it => ({ item: it.item, subescala: it.subescala })),
