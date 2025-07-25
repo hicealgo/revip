@@ -1,0 +1,50 @@
+{
+  "id": "revip-1753357900159",
+  "dimensiones": [
+    {
+      "puntos": 5,
+      "header": "¿Qué tan clara le parece la redacción del ítem?",
+      "nombre": "Claridad",
+      "der": "Claro",
+      "izq": "Confuso"
+    },
+    {
+      "der": "Relevante",
+      "nombre": "Relevancia",
+      "header": "¿Qué tan relevante le parece este ítem?",
+      "puntos": 5,
+      "izq": "Irrelevante"
+    },
+    {
+      "izq": "Impertinente",
+      "header": "¿Qué tan pertinente es el ítem?",
+      "nombre": "Pertinencia",
+      "der": "Pertinente",
+      "puntos": 5
+    }
+  ],
+  "lastModified": 1753373461245,
+  "metadata": {
+    "idioma": "es",
+    "nombre": "¿A qué lado de la fuerza perteneces?",
+    "autor": "Dr. Skywalker",
+    "subescalas": 2,
+    "poblacion": "Jóvenes de la galaxia",
+    "email": "juan@tk.cl",
+    "descripcion": "Diseñado para medir de forma exploratoria la inclinación de una persona hacia valores simbólicamente asociados con los arquetipos Jedi y Sith."
+  },
+  "subescalas": [
+    {
+      "tipo": "Likert",
+      "tipoDesc": "5 puntos",
+      "items": "Prefiero actuar con calma, incluso cuando las emociones son intensas.\nCreo que el equilibrio interior es esencial para tomar buenas decisiones.\nAyudar a los demás me da un sentido profundo de propósito.\nConfío en mi intuición para guiarme en momentos difíciles.",
+      "nombre": "Jedi"
+    },
+    {
+      "tipoDesc": "5 puntos",
+      "nombre": "Sith",
+      "tipo": "Likert",
+      "items": "Para lograr mis metas, a veces hay que romper las reglas.\nSiento que mis emociones me hacen más fuerte, no más débil.\nNo me gusta depender de otros; prefiero resolver las cosas por mi cuenta.\nMe atrae la idea de tener control total sobre mi propio destino."
+    }
+  ]
+}

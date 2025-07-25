@@ -30,19 +30,16 @@ let currentUser = null;
 
 // --- Auth UI ---
 function renderLogin() {
-  document.getElementById('app').innerHTML = `
-    <div class="card text-center mt-2">
-      <h1>REVIP</h1>
-      <p>Revisión de Expertos para Validez de Instrumentos Psicométricos</p>
-      <button id="google-login" style="background:#fff;color:#222;border:1px solid #e2e8f0;display:flex;align-items:center;gap:0.5em;justify-content:center;width:100%;font-weight:500;">
-        <img src="https://www.svgrepo.com/show/475656/google-color.svg" alt="Google" style="width:1.5em;height:1.5em;vertical-align:middle;"> Iniciar sesión con Google
-      </button>
-    </div>
-  `;
-  document.getElementById('google-login').onclick = () => {
-    const provider = new firebase.auth.GoogleAuthProvider();
-    auth.signInWithPopup(provider).catch(err => alert('Error de login: ' + err.message));
-  };
+  // Hide #app content if present
+  document.getElementById('app').innerHTML = '';
+  // Attach Google login handler to the intro card button if present
+  const loginBtn = document.getElementById('google-login');
+  if (loginBtn) {
+    loginBtn.onclick = () => {
+      const provider = new firebase.auth.GoogleAuthProvider();
+      auth.signInWithPopup(provider).catch(err => alert('Error de login: ' + err.message));
+    };
+  }
 }
 
 function logout() {
@@ -53,11 +50,19 @@ function logout() {
 async function getProjects() {
   if (!currentUser) return [];
   const snap = await db.collection('users').doc(currentUser.uid).collection('projects').orderBy('lastModified', 'desc').get();
+  if (snap.size > 10) {
+    alert('Máximo 10 proyectos propios por usuario. Elimine uno para crear otro.');
+    return snap.docs.slice(0, 10).map(doc => ({ id: doc.id, ...doc.data() }));
+  }
   return snap.docs.map(doc => ({ id: doc.id, ...doc.data() }));
 }
 async function saveProject(project) {
   if (!currentUser) return;
   const ref = db.collection('users').doc(currentUser.uid).collection('projects');
+  const err = validateProjectLimits(project);
+  if (err) { alert(err); return; }
+  const snap = await ref.get();
+  if (!project.id && snap.size >= 10) { alert('Máximo 10 proyectos propios por usuario.'); return; }
   if (project.id) {
     await ref.doc(project.id).set(project);
   } else {
@@ -81,8 +86,8 @@ async function renderDashboard() {
   document.getElementById('app').innerHTML = `
     <div class="flex flex-center" style="justify-content:space-between;align-items:center;">
       <div>
-        <h2 style="margin:0;">Hola, ${user.displayName || user.email}</h2>
-        <div style="font-size:0.95em;color:#888;">${user.email}</div>
+        <h2 style="margin:0;">Hola, ${currentUser.displayName || currentUser.email}</h2>
+        <div style="font-size:0.95em;color:#888;">${currentUser.email}</div>
       </div>
       <button style="background:#eee;color:#222;padding:0.5em 1em;font-size:0.9em;" id="logout-btn">Salir</button>
     </div>
@@ -90,8 +95,14 @@ async function renderDashboard() {
       <button id="new-revip">Nuevo proyecto REVIP</button>
       <button id="upload-revip" style="margin-left:0.5em;">Subir proyecto REVIP</button>
       <input type="file" id="upload-revip-file" accept="application/json" style="display:none;" />
+      <h3 style="margin-top:1.2em;">Mis proyectos</h3>
       <div id="projects-list" class="mt-2"></div>
     </div>
+    <div class="mt-4">
+      <h3>Proyectos compartidos conmigo</h3>
+      <div id="shared-projects-list"></div>
+    </div>
+    <footer style="margin-top:3em;text-align:center;color:#888;font-size:0.95em;">LAMP-UMAG | HiceAlgo Labs | 2025</footer>
   `;
   document.getElementById('logout-btn').onclick = logout;
   document.getElementById('new-revip').onclick = () => {
@@ -120,6 +131,7 @@ async function renderDashboard() {
     e.target.value = '';
   };
   renderProjectsList();
+  renderSharedProjectsList(); // Add this line to render shared projects
 }
 
 // --- Projects List ---
@@ -148,28 +160,35 @@ async function renderProjectsList() {
           <small>${p.metadata.autor || ''}</small>
           <div style="font-size:0.95em;color:#888;">Respuestas: <span id="resp-count-${p.id}">...</span></div>
         </div>
-        <div class="flex flex-center" style="gap:0.3em;">
-          <button class="icon-btn edit-btn" title="Editar" onclick="window.editProject('${p.id}')">
-            ${icons.edit}<span class="tooltip">Editar</span>
-          </button>
-          <button class="icon-btn download-btn" title="Descargar REVIP" onclick="window.downloadProject('${p.id}')">
-            ${icons.download}<span class="tooltip">Descargar</span>
-          </button>
-          <button class="icon-btn preview-btn" title="Vista previa" onclick="window.previewProject('${p.id}')">
-            ${icons.eye}<span class="tooltip">Vista previa</span>
-          </button>
-          <button class="icon-btn delete-btn" title="Eliminar" onclick="window.deleteProjectUI('${p.id}')">
-            ${icons.trash}<span class="tooltip">Eliminar</span>
-          </button>
-          <button class="icon-btn send-btn" title="Enviar" onclick="window.shareProject('${p.id}')">
-            ${icons.share}<span class="tooltip">Compartir</span>
-          </button>
-          <button class="icon-btn view-results-btn" title="Ver respuestas" data-id='${p.id}'>
-            <svg xmlns='http://www.w3.org/2000/svg' width='16' height='16' fill='currentColor' class='bi bi-table' viewBox='0 0 16 16'><path d='M0 3a2 2 0 0 1 2-2h12a2 2 0 0 1 2 2v10a2 2 0 0 1-2 2H2a2 2 0 0 1-2-2V3zm2-1a1 1 0 0 0-1 1v2h14V3a1 1 0 0 0-1-1H2zm13 4H1v7a1 1 0 0 0 1 1h12a1 1 0 0 0 1-1V6z'/></svg><span class="tooltip">Ver respuestas</span>
-          </button>
-          <button class="icon-btn analysis-btn" title="Análisis" data-id='${p.id}'>
-            <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" fill="currentColor" class="bi bi-file-bar-graph-fill" viewBox="0 0 16 16"><path d="M12 0H4a2 2 0 0 0-2 2v12a2 2 0 0 0 2 2h8a2 2 0 0 0 2-2V2a2 2 0 0 0-2-2m-2 11.5v-6a.5.5 0 0 1 .5-.5h1a.5.5 0 0 1 .5.5v6a.5.5 0 0 1-.5.5h-1a.5.5 0 0 1-.5-.5m-2.5.5a.5.5 0 0 1-.5-.5v-4a.5.5 0 0 1 .5-.5h1a.5.5 0 0 1 .5.5v4a.5.5 0 0 1-.5.5zm-3 0a.5.5 0 0 1-.5-.5v-2a.5.5 0 0 1 .5-.5h1a.5.5 0 0 1 .5.5v2a.5.5 0 0 1-.5.5z"/></svg><span class="tooltip">Análisis</span>
-          </button>
+        <div class="flex flex-center" style="gap:0.3em;flex-direction:column;">
+          <div style="display:flex;gap:0.3em;">
+            <button class="icon-btn edit-btn" title="Editar proyecto" onclick="window.editProject('${p.id}')">
+              ${icons.edit}<span class="tooltip">Editar</span>
+            </button>
+            <button class="icon-btn download-btn" title="Descargar proyecto (JSON)" onclick="window.downloadProject('${p.id}')">
+              ${icons.download}<span class="tooltip">Descargar</span>
+            </button>
+            <button class="icon-btn preview-btn" title="Vista previa (solo lectura)" onclick="window.previewProject('${p.id}')">
+              ${icons.eye}<span class="tooltip">Vista previa</span>
+            </button>
+            <button class="icon-btn delete-btn" title="Eliminar proyecto" onclick="window.deleteProjectUI('${p.id}')">
+              ${icons.trash}<span class="tooltip">Eliminar</span>
+            </button>
+          </div>
+          <div style="display:flex;gap:0.3em;margin-top:0.2em;">
+            <button class="icon-btn view-results-btn" title="Ver respuestas (solo lectura)" data-id='${p.id}'>
+              <svg xmlns='http://www.w3.org/2000/svg' width='16' height='16' fill='currentColor' class='bi bi-table' viewBox='0 0 16 16'><path d='M0 3a2 2 0 0 1 2-2h12a2 2 0 0 1 2 2v10a2 2 0 0 1-2 2H2a2 2 0 0 1-2-2V3zm2-1a1 1 0 0 0-1 1v2h14V3a1 1 0 0 0-1-1H2zm13 4H1v7a1 1 0 0 0 1 1h12a1 1 0 0 0 1-1V6z'/></svg><span class="tooltip">Ver respuestas</span>
+            </button>
+            <button class="icon-btn analysis-btn" title="Análisis de ítems" data-id='${p.id}'>
+              <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" fill="currentColor" class="bi bi-file-bar-graph-fill" viewBox="0 0 16 16"><path d="M12 0H4a2 2 0 0 0-2 2v12a2 2 0 0 0 2 2h8a2 2 0 0 0 2-2V2a2 2 0 0 0-2-2m-2 11.5v-6a.5.5 0 0 1 .5-.5h1a.5.5 0 0 1 .5.5v6a.5.5 0 0 1-.5.5h-1a.5.5 0 0 1-.5-.5m-2.5.5a.5.5 0 0 1-.5-.5v-4a.5.5 0 0 1 .5-.5h1a.5.5 0 0 1 .5.5v4a.5.5 0 0 1-.5.5zm-3 0a.5.5 0 0 1-.5-.5v-2a.5.5 0 0 1 .5-.5h1a.5.5 0 0 1 .5.5v2a.5.5 0 0 1-.5.5z"/></svg><span class="tooltip">Análisis</span>
+            </button>
+            <button class="icon-btn send-btn" title="Enviar link a jueces" onclick="window.shareProject('${p.id}')">
+              <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" fill="currentColor" class="bi bi-send" viewBox="0 0 16 16"><path d="M15.854.146a.5.5 0 0 1 .11.54l-5.819 14.547a.75.75 0 0 1-1.329.124l-3.178-4.995L.643 7.184a.75.75 0 0 1 .124-1.33L15.314.037a.5.5 0 0 1 .54.11ZM6.636 10.07l2.761 4.338L14.13 2.576zm6.787-8.201L1.591 6.602l4.339 2.76z"/></svg><span class="tooltip">Enviar</span>
+            </button>
+            <button class="icon-btn share-btn" title="Compartir proyecto con usuarios" onclick="window.openShareModal('${p.id}')">
+              <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" fill="currentColor" class="bi bi-share-fill" viewBox="0 0 16 16"><path d="M11 2.5a2.5 2.5 0 1 1 .603 1.628l-6.718 3.12a2.5 2.5 0 0 1 0 1.504l6.718 3.12a2.5 2.5 0 1 1-.488.876l-6.718-3.12a2.5 2.5 0 1 1 0-3.256l6.718-3.12A2.5 2.5 0 0 1 11 2.5"/></svg><span class="tooltip">Compartir</span>
+            </button>
+          </div>
         </div>
       </div>
       <div style="margin-top:0.5em;font-size:0.9em;color:#666;">
@@ -379,6 +398,76 @@ window.deleteProjectUI = async function(id) {
   }
 };
 
+// --- Firestore Sharing Logic ---
+// Add email to project's sharedWith array and update guest's sharedProjects
+async function shareProjectWithEmail(projectId, email) {
+  if (!currentUser) return { error: 'No autenticado.' };
+  if (!email || typeof email !== 'string') return { error: 'Correo inválido.' };
+  email = email.trim().toLowerCase();
+  if (email === currentUser.email) return { error: 'No puede compartir consigo mismo.' };
+  // Get project
+  const ref = db.collection('users').doc(currentUser.uid).collection('projects').doc(projectId);
+  const doc = await ref.get();
+  if (!doc.exists) return { error: 'Proyecto no encontrado.' };
+  const project = doc.data();
+  let sharedWith = Array.isArray(project.sharedWith) ? project.sharedWith : [];
+  if (sharedWith.includes(email)) return { error: 'Ya compartido con este correo.' };
+  if (sharedWith.length >= 10) return { error: 'Máximo 10 personas por proyecto.' };
+  sharedWith.push(email);
+  await ref.update({ sharedWith });
+  // If user exists, add to their sharedProjects
+  const userSnap = await db.collection('users').where('email', '==', email).get();
+  if (!userSnap.empty) {
+    const guestId = userSnap.docs[0].id;
+    await db.collection('users').doc(guestId).collection('sharedProjects').doc(projectId).set({
+      ownerId: currentUser.uid,
+      projectId,
+      sharedAt: Date.now(),
+    });
+  }
+  return { success: true };
+}
+// Remove email from sharedWith and guest's sharedProjects
+async function unshareProjectWithEmail(projectId, email) {
+  if (!currentUser) return { error: 'No autenticado.' };
+  email = email.trim().toLowerCase();
+  const ref = db.collection('users').doc(currentUser.uid).collection('projects').doc(projectId);
+  const doc = await ref.get();
+  if (!doc.exists) return { error: 'Proyecto no encontrado.' };
+  const project = doc.data();
+  let sharedWith = Array.isArray(project.sharedWith) ? project.sharedWith : [];
+  sharedWith = sharedWith.filter(e => e !== email);
+  await ref.update({ sharedWith });
+  // Remove from guest's sharedProjects if user exists
+  const userSnap = await db.collection('users').where('email', '==', email).get();
+  if (!userSnap.empty) {
+    const guestId = userSnap.docs[0].id;
+    await db.collection('users').doc(guestId).collection('sharedProjects').doc(projectId).delete();
+  }
+  return { success: true };
+}
+// When a user logs in, sync their sharedProjects with projects where their email is in sharedWith
+async function syncSharedProjectsForUser() {
+  if (!currentUser) return;
+  // Find all projects where sharedWith contains currentUser.email
+  const allUsers = await db.collection('users').get();
+  for (const userDoc of allUsers.docs) {
+    const projectsSnap = await db.collection('users').doc(userDoc.id).collection('projects').where('sharedWith', 'array-contains', currentUser.email).get();
+    for (const projDoc of projectsSnap.docs) {
+      await db.collection('users').doc(currentUser.uid).collection('sharedProjects').doc(projDoc.id).set({
+        ownerId: userDoc.id,
+        projectId: projDoc.id,
+        sharedAt: Date.now(),
+      });
+    }
+  }
+}
+// Remove a shared project from my dashboard (disconnect)
+async function disconnectSharedProject(projectId) {
+  if (!currentUser) return;
+  await db.collection('users').doc(currentUser.uid).collection('sharedProjects').doc(projectId).delete();
+}
+
 function startBuilder(existingProject) {
   let step = 1;
   let isEdit = !!existingProject;
@@ -583,6 +672,10 @@ function startBuilder(existingProject) {
 
   async function saveProjectBuilder() {
     project.lastModified = Date.now();
+    const err = validateProjectLimits(project);
+    if (err) { alert(err); return; }
+    const snap = await db.collection('users').doc(currentUser.uid).collection('projects').get();
+    if (!project.id && snap.size >= 10) { alert('Máximo 10 proyectos propios por usuario.'); return; }
     await saveProject(project);
     renderDashboard();
   }
@@ -693,7 +786,7 @@ function renderJudgeView(project, previewMode = false) {
       let html = `
         ${renderProgressBar()}
         <div style="font-size:0.98em;margin-bottom:0.7em;text-align:justify;color:#666;">${contextLine}</div>
-        <div class="judge-item-text">“${it.item}”</div>
+        <div class="judge-item-text">"${it.item}"</div>
         <div style="margin:1em 0;">
           ${dims.map((dim, di) => `
             <div style="margin-bottom:1em;">
@@ -765,12 +858,200 @@ function renderJudgeView(project, previewMode = false) {
   }
 }
 
+window.openShareModal = async function(projectId) {
+  if (!currentUser) return;
+  const ref = db.collection('users').doc(currentUser.uid).collection('projects').doc(projectId);
+  let modalDiv;
+  async function renderModal(msg = '') {
+    const doc = await ref.get();
+    if (!doc.exists) return alert('Proyecto no encontrado.');
+    const project = doc.data();
+    let sharedWith = Array.isArray(project.sharedWith) ? project.sharedWith : [];
+    let html = `<div class='judge-card'><h3>Compartir proyecto</h3>
+      <div style='margin-bottom:1em;'>
+        <b>${project.metadata.nombre || 'Sin nombre'}</b><br>
+        <span style='color:#888;'>${project.metadata.descripcion || ''}</span>
+      </div>
+      <div style='margin-bottom:1em;'>
+        <label>Correo electrónico para compartir:<br>
+          <input type='email' id='share-email' placeholder='correo@ejemplo.com' style='width:70%;' maxlength='100' />
+          <button id='add-share-btn'>Añadir</button>
+        </label>
+      </div>
+      <div style='margin-bottom:1em;'>
+        <b>Compartido con:</b>
+        <ul id='shared-list' style='list-style:none;padding:0;'>
+          ${sharedWith.length ? sharedWith.map(email => `<li style='margin-bottom:0.3em;'>${email} <button class='remove-share-btn' data-email='${email}' title='Quitar acceso' style='color:#c00;background:none;border:none;font-size:1em;cursor:pointer;'>&#10006;</button></li>`).join('') : '<span style="color:#888;">Nadie aún.</span>'}
+        </ul>
+      </div>
+      <div id='share-msg' style='color:${msg.startsWith('¡') ? 'green' : 'red'};margin-bottom:1em;'>${msg}</div>
+      <div style='text-align:right;'><button id='close-share-modal'>Cerrar</button></div>
+    </div>`;
+    if (!modalDiv) {
+      modalDiv = document.createElement('div');
+      modalDiv.style.position = 'fixed';
+      modalDiv.style.top = '0';
+      modalDiv.style.left = '0';
+      modalDiv.style.width = '100vw';
+      modalDiv.style.height = '100vh';
+      modalDiv.style.background = 'rgba(0,0,0,0.15)';
+      modalDiv.style.zIndex = '9999';
+      document.body.appendChild(modalDiv);
+    }
+    modalDiv.innerHTML = `<div style='max-width:520px;margin:3em auto;background:#fff;padding:2em;border-radius:1em;'>${html}</div>`;
+    document.getElementById('close-share-modal').onclick = () => document.body.removeChild(modalDiv);
+    document.getElementById('add-share-btn').onclick = async () => {
+      const email = document.getElementById('share-email').value.trim();
+      if (!email) return renderModal('Ingrese un correo.');
+      const res = await shareProjectWithEmail(projectId, email);
+      if (res.error) return renderModal(res.error);
+      await syncSharedProjectsForUser();
+      renderModal('¡Compartido exitosamente!');
+    };
+    document.querySelectorAll('.remove-share-btn').forEach(btn => {
+      btn.onclick = async () => {
+        const email = btn.getAttribute('data-email');
+        await unshareProjectWithEmail(projectId, email);
+        await syncSharedProjectsForUser();
+        renderModal('Acceso quitado.');
+      };
+    });
+  }
+  renderModal();
+};
+
 // Entry point
 auth.onAuthStateChanged(user => {
   currentUser = user;
   if (user) {
+    // Hide intro card if present
+    const introCard = document.querySelector('.card.text-center');
+    if (introCard) introCard.style.display = 'none';
     renderDashboard();
   } else {
+    // Show intro card
+    const introCard = document.querySelector('.card.text-center');
+    if (introCard) introCard.style.display = '';
     renderLogin();
   }
 }); 
+
+async function renderSharedProjectsList() {
+  if (!currentUser) return;
+  const snap = await db.collection('users').doc(currentUser.uid).collection('sharedProjects').get();
+  const sharedRefs = snap.docs.map(doc => doc.data());
+  if (sharedRefs.length > 10) {
+    alert('Máximo 10 proyectos compartidos por usuario. Elimine uno para ver otro.');
+  }
+  const list = document.getElementById('shared-projects-list');
+  if (!sharedRefs.length) {
+    list.innerHTML = '<p style="color:#888;">No hay proyectos compartidos contigo.</p>';
+    return;
+  }
+  // Fetch project data for each shared project (limit 10)
+  let cards = await Promise.all(sharedRefs.slice(0,10).map(async ref => {
+    const projDoc = await db.collection('users').doc(ref.ownerId).collection('projects').doc(ref.projectId).get();
+    if (!projDoc.exists) return '';
+    const p = projDoc.data();
+    return `<div class="card" style="margin-bottom:1em;">
+      <div style="display:flex;justify-content:space-between;align-items:center;gap:0.5em;">
+        <div>
+          <strong>${p.metadata?.nombre || 'Sin nombre'}</strong><br>
+          <small>${p.metadata?.autor || ''}</small>
+          <div style="font-size:0.95em;color:#888;">Propietario: ${p.metadata?.email || ''}</div>
+        </div>
+        <div class="flex flex-center" style="gap:0.3em;">
+          <button class="icon-btn download-btn" title="Descargar proyecto (JSON)" onclick="window.downloadSharedProject('${ref.ownerId}','${ref.projectId}')">
+            <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" fill="currentColor" class="bi bi-download" viewBox="0 0 16 16"><path d="M.5 9.9a.5.5 0 0 1 .5.5v2.5a1 1 0 0 0 1 1h12a1 1 0 0 0 1-1v-2.5a.5.5 0 0 1 1 0v2.5a2 2 0 0 1-2 2H2a2 2 0 0 1-2-2v-2.5a.5.5 0 0 1 .5-.5"/><path d="M7.646 11.854a.5.5 0 0 0 .708 0l3-3a.5.5 0 0 0-.708-.708L8.5 10.293V1.5a.5.5 0 0 0-1 0v8.793L5.354 8.146a.5.5 0 1 0-.708.708z"/></svg><span class="tooltip">Descargar</span>
+          </button>
+          <button class="icon-btn preview-btn" title="Vista previa (solo lectura)" onclick="window.previewSharedProject('${ref.ownerId}','${ref.projectId}')">
+            <svg viewBox="0 0 20 20"><path d="M10 4c-5 0-9 6-9 6s4 6 9 6 9-6 9-6-4-6-9-6zm0 10a4 4 0 1 1 0-8 4 4 0 0 1 0 8zm0-6a2 2 0 1 0 0 4 2 2 0 0 0 0-4z"/></svg><span class="tooltip">Vista previa</span>
+          </button>
+          <button class="icon-btn view-results-btn" title="Ver respuestas (solo lectura)" onclick="window.viewSharedResponses('${ref.ownerId}','${ref.projectId}')">
+            <svg xmlns='http://www.w3.org/2000/svg' width='16' height='16' fill='currentColor' class='bi bi-table' viewBox='0 0 16 16'><path d='M0 3a2 2 0 0 1 2-2h12a2 2 0 0 1 2 2v10a2 2 0 0 1-2 2H2a2 2 0 0 1-2-2V3zm2-1a1 1 0 0 0-1 1v2h14V3a1 1 0 0 0-1-1H2zm13 4H1v7a1 1 0 0 0 1 1h12a1 1 0 0 0 1-1V6z'/></svg><span class="tooltip">Ver respuestas</span>
+          </button>
+          <button class="icon-btn disconnect-btn" title="Desconectar (quitar de mi panel)" onclick="window.disconnectSharedProjectUI('${ref.projectId}')">
+            <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" fill="currentColor" class="bi bi-x-square-fill" viewBox="0 0 16 16"><path d="M2 16a2 2 0 0 1-2-2V2a2 2 0 0 1 2-2h12a2 2 0 0 1 2 2v12a2 2 0 0 1-2 2H2zm8.146-4.354a.5.5 0 0 0 .708-.708L8.707 8l2.147-2.146a.5.5 0 0 0-.708-.708L8 7.293 5.854 5.146a.5.5 0 1 0-.708.708L7.293 8l-2.147 2.146a.5.5 0 0 0 .708.708L8 8.707l2.146 2.147z"/></svg><span class="tooltip">Desconectar</span>
+          </button>
+        </div>
+      </div>
+    </div>`;
+  }));
+  list.innerHTML = cards.join('');
+}
+
+// Add window handlers for shared project actions
+window.downloadSharedProject = async function(ownerId, projectId) {
+  const doc = await db.collection('users').doc(ownerId).collection('projects').doc(projectId).get();
+  if (!doc.exists) return alert('Proyecto no encontrado.');
+  const project = doc.data();
+  const dataStr = "data:text/json;charset=utf-8," + encodeURIComponent(JSON.stringify(project, null, 2));
+  const dlAnchor = document.createElement('a');
+  dlAnchor.setAttribute("href", dataStr);
+  dlAnchor.setAttribute("download", `${project.metadata?.nombre || 'revip'}.json`);
+  document.body.appendChild(dlAnchor);
+  dlAnchor.click();
+  dlAnchor.remove();
+};
+window.previewSharedProject = async function(ownerId, projectId) {
+  const doc = await db.collection('users').doc(ownerId).collection('projects').doc(projectId).get();
+  if (!doc.exists) return alert('Proyecto no encontrado.');
+  const project = doc.data();
+  renderJudgeView(project, true);
+};
+window.viewSharedResponses = async function(ownerId, projectId) {
+  const snap = await db.collection('users').doc(ownerId).collection('projects').doc(projectId).collection('responses').get();
+  const responses = snap.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+  // Reuse modal logic from window.viewResponses, but read-only
+  let html = `<div class='judge-card'><h3>Respuestas recibidas: ${responses.length}</h3>`;
+  if (!responses.length) {
+    html += '<p style="color:#888;">Aún no hay respuestas.</p>';
+  } else {
+    html += `<div style='overflow-x:auto;'><table border='1' cellpadding='4' style='width:100%;margin-top:1em;font-size:0.95em;'><thead><tr><th>Fecha</th><th>Experto/a</th><th>Correo</th></tr></thead><tbody>`;
+    responses.forEach(r => {
+      html += `<tr><td>${r.submittedAt ? new Date(r.submittedAt).toLocaleString('es-CL') : ''}</td><td>${r.experto?.nombre || ''}</td><td>${r.experto?.correo || ''}</td></tr>`;
+    });
+    html += '</tbody></table></div>';
+  }
+  html += `<div style='text-align:right;margin-top:1.5em;'><button id='close-shared-resp'>Cerrar</button></div></div>`;
+  const modal = document.createElement('div');
+  modal.style.position = 'fixed';
+  modal.style.top = '0';
+  modal.style.left = '0';
+  modal.style.width = '100vw';
+  modal.style.height = '100vh';
+  modal.style.background = 'rgba(0,0,0,0.15)';
+  modal.style.zIndex = '9999';
+  modal.innerHTML = `<div style='max-width:520px;margin:3em auto;'>${html}</div>`;
+  document.body.appendChild(modal);
+  document.getElementById('close-shared-resp').onclick = () => document.body.removeChild(modal);
+};
+window.disconnectSharedProjectUI = async function(projectId) {
+  if (confirm('¿Seguro que desea quitar este proyecto compartido de tu panel?')) {
+    await disconnectSharedProject(projectId);
+    renderSharedProjectsList();
+  }
+}; 
+
+// --- Validation and Limits ---
+function validateProjectLimits(project) {
+  // Char limits
+  if ((project.metadata.nombre || '').length > 100) return 'El nombre del proyecto no puede superar 100 caracteres.';
+  if ((project.metadata.descripcion || '').length > 500) return 'La descripción no puede superar 500 caracteres.';
+  if (project.subescalas.length > 25) return 'Máximo 25 subescalas por proyecto.';
+  let totalItems = 0;
+  for (let s of project.subescalas) {
+    if ((s.nombre || '').length > 100) return 'El nombre de la subescala no puede superar 100 caracteres.';
+    const items = (s.items || '').split('\n').filter(Boolean);
+    totalItems += items.length;
+    for (let item of items) {
+      if (item.length > 500) return 'El texto de un ítem no puede superar 500 caracteres.';
+    }
+  }
+  if (totalItems > 100) return 'Máximo 100 ítems por proyecto.';
+  if (project.dimensiones.length > 10) return 'Máximo 10 dimensiones de juicio por proyecto.';
+  for (let d of project.dimensiones) {
+    if ((d.nombre || '').length > 100) return 'El nombre de la dimensión no puede superar 100 caracteres.';
+  }
+  return null;
+} 
