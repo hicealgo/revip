@@ -561,7 +561,7 @@ async function disconnectSharedProject(projectId) {
   }
 }
 
-function startBuilder(existingProject) {
+function startBuilder(existingProject, editOwnerId = null, editProjectId = null) {
   let step = 1;
   let isEdit = !!existingProject;
   let project = existingProject ? JSON.parse(JSON.stringify(existingProject)) : {
@@ -767,6 +767,13 @@ function startBuilder(existingProject) {
     project.lastModified = Date.now();
     const err = validateProjectLimits(project);
     if (err) { alert(err); return; }
+    // If editing a shared project, save to the original owner's collection
+    if (editOwnerId && editProjectId) {
+      await db.collection('users').doc(editOwnerId).collection('projects').doc(editProjectId).set(project);
+      renderDashboard();
+      return;
+    }
+    // Otherwise, normal save
     const snap = await db.collection('users').doc(currentUser.uid).collection('projects').get();
     if (!project.id && snap.size >= 10) { alert('Máximo 10 proyectos propios por usuario.'); return; }
     await saveProject(project);
@@ -1081,12 +1088,18 @@ async function renderSharedProjectsList() {
         // Get owner's email
         const ownerDoc = await db.collection('users').doc(ref.ownerId).get();
         const ownerEmail = ownerDoc.exists ? ownerDoc.data().email : 'Unknown';
-        
+        // Fetch response count
+        let respCount = 0;
+        try {
+          const respSnap = await db.collection('users').doc(ref.ownerId).collection('projects').doc(ref.projectId).collection('responses').get();
+          respCount = respSnap.size;
+        } catch (e) { respCount = 0; }
         return `<div class="card" style="margin-bottom:1em;">
           <div style="display:flex;justify-content:space-between;align-items:center;gap:0.5em;">
             <div>
               <strong>${p.metadata?.nombre || 'Sin nombre'}</strong><br>
-              <div style="font-size:0.95em;color:#888;">Propietario: ${ownerEmail}</div>
+              <small>${ownerEmail}</small>
+              <div style="font-size:0.95em;color:#888;">Respuestas: <span>${respCount}</span></div>
             </div>
             <div class="flex flex-center" style="gap:0.3em;flex-direction:column;">
               <div style="display:flex;gap:0.3em;">
@@ -1270,30 +1283,18 @@ window.previewSharedProject = async function(ownerId, projectId) {
 };
 
 window.editSharedProject = async function(ownerId, projectId) {
-  // Check if current user can edit this project (they need to be the owner)
-  if (ownerId !== currentUser.uid) {
-    alert('Solo el propietario puede editar este proyecto.');
-    return;
-  }
-  
-  // Fetch the project and start the builder
+  // Allow any user with access to edit
   const doc = await db.collection('users').doc(ownerId).collection('projects').doc(projectId).get();
   if (!doc.exists) {
     alert('Proyecto no encontrado.');
     return;
   }
   const project = doc.data();
-  startBuilder(project);
+  startBuilder(project, ownerId, projectId);
 };
 
 window.analysisSharedProject = async function(ownerId, projectId) {
-  // Check if current user can analyze this project (they need to be the owner)
-  if (ownerId !== currentUser.uid) {
-    alert('Solo el propietario puede analizar este proyecto.');
-    return;
-  }
-  
-  // Fetch responses
+  // Allow any user with access to analyze
   const snap = await db.collection('users').doc(ownerId).collection('projects').doc(projectId).collection('responses').get();
   const responses = snap.docs.map(doc => ({ id: doc.id, ...doc.data() }));
   if (!responses.length) {
@@ -1338,66 +1339,8 @@ window.analysisSharedProject = async function(ownerId, projectId) {
   document.getElementById('close-analysis').onclick = () => document.body.removeChild(modal);
 };
 
-window.shareSharedProject = async function(ownerId, projectId) {
-  // Check if current user can share this project (they need to be the owner)
-  if (ownerId !== currentUser.uid) {
-    alert('Solo el propietario puede compartir este proyecto.');
-    return;
-  }
-  
-  // More robust URL generation
-  let publicPath;
-  if (window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1') {
-    // Local development
-    publicPath = window.location.origin + '/public.html';
-  } else if (window.location.pathname.includes('/revip')) {
-    // GitHub Pages
-    publicPath = window.location.origin + '/revip/public.html';
-  } else {
-    // Fallback
-    publicPath = window.location.origin + '/public.html';
-  }
-  
-  console.log('Generated public path:', publicPath);
-  
-  const url = new URL(publicPath);
-  url.searchParams.set('userId', ownerId);
-  url.searchParams.set('projectId', projectId);
-  // Prompt for prefill?
-  const nombre = prompt('¿Prefieres prellenar el nombre del juez? (opcional)');
-  if (nombre) url.searchParams.set('nombre', nombre);
-  const correo = nombre ? prompt('¿Prefieres prellenar el correo del juez? (opcional)') : '';
-  if (correo) url.searchParams.set('correo', correo);
-  // Show modal with link and copy button
-  let html = `<div class='judge-card'><h3>Link para jueces</h3><input type='text' id='share-link' value='${url.toString()}' readonly style='width:100%;font-size:1em;margin-bottom:1em;' /><button id='copy-link'>Copiar link</button><div style='text-align:right;margin-top:1.5em;'><button id='close-share'>Cerrar</button></div></div>`;
-  const modal = document.createElement('div');
-  modal.style.position = 'fixed';
-  modal.style.top = '0';
-  modal.style.left = '0';
-  modal.style.width = '100vw';
-  modal.style.height = '100vh';
-  modal.style.background = 'rgba(0,0,0,0.15)';
-  modal.style.zIndex = '9999';
-  modal.innerHTML = `<div style='max-width:520px;margin:3em auto;'>${html}</div>`;
-  document.body.appendChild(modal);
-  document.getElementById('close-share').onclick = () => document.body.removeChild(modal);
-  document.getElementById('copy-link').onclick = async () => {
-    try {
-      await navigator.clipboard.writeText(url.toString());
-      alert('¡Link copiado al portapapeles!');
-    } catch {
-      alert('No se pudo copiar automáticamente. Selecciona y copia el link.');
-    }
-  };
-};
-
 window.openShareModalShared = async function(ownerId, projectId) {
-  // Check if current user can share this project (they need to be the owner)
-  if (ownerId !== currentUser.uid) {
-    alert('Solo el propietario puede compartir este proyecto.');
-    return;
-  }
-  
+  // Allow any user with access to share
   // Fetch current sharing status
   const doc = await db.collection('users').doc(ownerId).collection('projects').doc(projectId).get();
   if (!doc.exists) {
@@ -1406,7 +1349,6 @@ window.openShareModalShared = async function(ownerId, projectId) {
   }
   const project = doc.data();
   const sharedWith = project.sharedWith || [];
-  
   // Show modal with current shares and add/remove options
   let html = `<div class='judge-card'><h3>Compartir proyecto</h3>`;
   html += `<div style='margin-bottom:1em;'><input type='email' id='share-email' placeholder='Correo del usuario' style='width:100%;padding:0.5em;' /><button id='add-share-btn' style='margin-left:0.5em;'>Agregar</button></div>`;
@@ -1450,4 +1392,44 @@ window.openShareModalShared = async function(ownerId, projectId) {
       document.body.removeChild(modalDiv);
     };
   });
+};
+
+window.shareSharedProject = async function(ownerId, projectId) {
+  // Allow any user with access to send judge link
+  // ... use the same logic as before ...
+  let publicPath;
+  if (window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1') {
+    publicPath = window.location.origin + '/public.html';
+  } else if (window.location.pathname.includes('/revip')) {
+    publicPath = window.location.origin + '/revip/public.html';
+  } else {
+    publicPath = window.location.origin + '/public.html';
+  }
+  const url = new URL(publicPath);
+  url.searchParams.set('userId', ownerId);
+  url.searchParams.set('projectId', projectId);
+  const nombre = prompt('¿Prefieres prellenar el nombre del juez? (opcional)');
+  if (nombre) url.searchParams.set('nombre', nombre);
+  const correo = nombre ? prompt('¿Prefieres prellenar el correo del juez? (opcional)') : '';
+  if (correo) url.searchParams.set('correo', correo);
+  let html = `<div class='judge-card'><h3>Link para jueces</h3><input type='text' id='share-link' value='${url.toString()}' readonly style='width:100%;font-size:1em;margin-bottom:1em;' /><button id='copy-link'>Copiar link</button><div style='text-align:right;margin-top:1.5em;'><button id='close-share'>Cerrar</button></div></div>`;
+  const modal = document.createElement('div');
+  modal.style.position = 'fixed';
+  modal.style.top = '0';
+  modal.style.left = '0';
+  modal.style.width = '100vw';
+  modal.style.height = '100vh';
+  modal.style.background = 'rgba(0,0,0,0.15)';
+  modal.style.zIndex = '9999';
+  modal.innerHTML = `<div style='max-width:520px;margin:3em auto;'>${html}</div>`;
+  document.body.appendChild(modal);
+  document.getElementById('close-share').onclick = () => document.body.removeChild(modal);
+  document.getElementById('copy-link').onclick = async () => {
+    try {
+      await navigator.clipboard.writeText(url.toString());
+      alert('¡Link copiado al portapapeles!');
+    } catch {
+      alert('No se pudo copiar automáticamente. Selecciona y copia el link.');
+    }
+  };
 };
