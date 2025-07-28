@@ -1094,10 +1094,13 @@ async function renderSharedProjectsList() {
                   <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 16 16" fill="currentColor"><path d="M12.146.146a.5.5 0 0 1 .708 0l3 3a.5.5 0 0 1 0 .708l-10 10a.5.5 0 0 1-.168.11l-5 2a.5.5 0 0 1-.65-.65l2-5a.5.5 0 0 1 .11-.168zM11.207 2.5 13.5 4.793 14.793 3.5 12.5 1.207zm1.586 3L10.5 3.207 4 9.707V10h.5a.5.5 0 0 1 .5.5v.5h.5a.5.5 0 0 1 .5.5v.5h.293zm-9.761 5.175-.106.106-1.528 3.821 3.821-1.528.106-.106A.5.5 0 0 1 5 12.5V12h-.5a.5.5 0 0 1-.5-.5V11h-.5a.5.5 0 0 1-.468-.325"/></svg><span class="tooltip">Editar</span>
                 </button>
                 <button class="icon-btn download-btn" title="Descargar proyecto (JSON)" onclick="window.downloadSharedProject('${ref.ownerId}','${ref.projectId}')">
-                  <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" fill="currentColor" class="bi bi-download" viewBox="0 0 16 16"><path d="M.5 9.9a.5.5 0 0 1 .5.5v2.5a1 1 0 0 0 1 1h12a1 1 0 0 0 1-1v-2.5a.5.5 0 0 1 1 0v2.5a2 2 0 0 1-2 2H2a2 2 0 0 1-2-2v-2.5a.5.5 0 0 1 .5-.5"/><path d="M7.646 11.854a.5.5 0 0 0 .708 0l3-3a.5.5 0 0 0-.708-.708L8.5 10.293V1.5a.5.5 0 0 0-1 0v8.793L5.354 8.146a.5.5 0 1 0-.708.708z"/></svg><span class="tooltip">Descargar</span>
+                  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 16 16" fill="currentColor"><path d="M.5 9.9a.5.5 0 0 1 .5.5v2.5a1 1 0 0 0 1 1h12a1 1 0 0 0 1-1v-2.5a.5.5 0 0 1 1 0v2.5a2 2 0 0 1-2 2H2a2 2 0 0 1-2-2v-2.5a.5.5 0 0 1 .5-.5"/><path d="M7.646 11.854a.5.5 0 0 0 .708 0l3-3a.5.5 0 0 0-.708-.708L8.5 10.293V1.5a.5.5 0 0 0-1 0v8.793L5.354 8.146a.5.5 0 1 0-.708.708z"/></svg><span class="tooltip">Descargar</span>
                 </button>
                 <button class="icon-btn preview-btn" title="Vista previa (solo lectura)" onclick="window.previewSharedProject('${ref.ownerId}','${ref.projectId}')">
                   <svg viewBox="0 0 20 20"><path d="M10 4c-5 0-9 6-9 6s4 6 9 6 9-6 9-6-4-6-9-6zm0 10a4 4 0 1 1 0-8 4 4 0 0 1 0 8zm0-6a2 2 0 1 0 0 4 2 2 0 0 0 0-4z"/></svg><span class="tooltip">Vista previa</span>
+                </button>
+                <button class="icon-btn disconnect-btn" title="Desconectar (quitar de mi panel)" onclick="window.disconnectSharedProjectUI('${ref.projectId}')">
+                  <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" fill="currentColor" class="bi bi-x-square-fill" viewBox="0 0 16 16"><path d="M2 16a2 2 0 0 1-2-2V2a2 2 0 0 1 2-2h12a2 2 0 0 1 2 2v12a2 2 0 0 1-2 2H2zm8.146-4.354a.5.5 0 0 0 .708-.708L8.707 8l2.147-2.146a.5.5 0 0 0-.708-.708L8 7.293 5.854 5.146a.5.5 0 1 0-.708.708L7.293 8l-2.147 2.146a.5.5 0 0 0 .708.708L8 8.707l2.146 2.147z"/></svg><span class="tooltip">Desconectar</span>
                 </button>
               </div>
               <div style="display:flex;gap:0.3em;margin-top:0.2em;">
@@ -1110,8 +1113,8 @@ async function renderSharedProjectsList() {
                 <button class="icon-btn send-btn" title="Enviar link a jueces" onclick="window.shareSharedProject('${ref.ownerId}','${ref.projectId}')">
                   <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" fill="currentColor" class="bi bi-send" viewBox="0 0 16 16"><path d="M15.854.146a.5.5 0 0 1 .11.54l-5.819 14.547a.75.75 0 0 1-1.329.124l-3.178-4.995L.643 7.184a.75.75 0 0 1 .124-1.33L15.314.037a.5.5 0 0 1 .54.11ZM6.636 10.07l2.761 4.338L14.13 2.576zm6.787-8.201L1.591 6.602l4.339 2.76z"/></svg><span class="tooltip">Enviar</span>
                 </button>
-                <button class="icon-btn disconnect-btn" title="Desconectar (quitar de mi panel)" onclick="window.disconnectSharedProjectUI('${ref.projectId}')">
-                  <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" fill="currentColor" class="bi bi-x-square-fill" viewBox="0 0 16 16"><path d="M2 16a2 2 0 0 1-2-2V2a2 2 0 0 1 2-2h12a2 2 0 0 1 2 2v12a2 2 0 0 1-2 2H2zm8.146-4.354a.5.5 0 0 0 .708-.708L8.707 8l2.147-2.146a.5.5 0 0 0-.708-.708L8 7.293 5.854 5.146a.5.5 0 1 0-.708.708L7.293 8l-2.147 2.146a.5.5 0 0 0 .708.708L8 8.707l2.146 2.147z"/></svg><span class="tooltip">Desconectar</span>
+                <button class="icon-btn share-btn" title="Compartir proyecto con usuarios" onclick="window.openShareModalShared('${ref.ownerId}','${ref.projectId}')">
+                  <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" fill="currentColor" class="bi bi-share-fill" viewBox="0 0 16 16"><path d="M11 2.5a2.5 2.5 0 1 1 .603 1.628l-6.718 3.12a2.5 2.5 0 0 1 0 1.504l6.718 3.12a2.5 2.5 0 1 1-.488.876l-6.718-3.12a2.5 2.5 0 1 1 0-3.256l6.718-3.12A2.5 2.5 0 0 1 11 2.5"/></svg><span class="tooltip">Compartir</span>
                 </button>
               </div>
             </div>
@@ -1267,18 +1270,29 @@ window.previewSharedProject = async function(ownerId, projectId) {
 };
 
 window.editSharedProject = async function(ownerId, projectId) {
-  const doc = await db.collection('users').doc(ownerId).collection('projects').doc(projectId).get();
-  if (!doc.exists) return alert('Proyecto no encontrado.');
-  const project = doc.data();
   // Check if current user can edit this project (they need to be the owner)
   if (ownerId !== currentUser.uid) {
     alert('Solo el propietario puede editar este proyecto.');
     return;
   }
+  
+  // Fetch the project and start the builder
+  const doc = await db.collection('users').doc(ownerId).collection('projects').doc(projectId).get();
+  if (!doc.exists) {
+    alert('Proyecto no encontrado.');
+    return;
+  }
+  const project = doc.data();
   startBuilder(project);
 };
 
 window.analysisSharedProject = async function(ownerId, projectId) {
+  // Check if current user can analyze this project (they need to be the owner)
+  if (ownerId !== currentUser.uid) {
+    alert('Solo el propietario puede analizar este proyecto.');
+    return;
+  }
+  
   // Fetch responses
   const snap = await db.collection('users').doc(ownerId).collection('projects').doc(projectId).collection('responses').get();
   const responses = snap.docs.map(doc => ({ id: doc.id, ...doc.data() }));
@@ -1302,15 +1316,15 @@ window.analysisSharedProject = async function(ownerId, projectId) {
   dims.forEach(d => { html += `<th>${d}</th>`; });
   html += `<th>N respuestas</th><th>Comentarios</th></tr></thead><tbody>`;
   stats.forEach(s => {
-    html += `<tr${s.vals.some(v=>v.avg<3)?' style="background:#fee;"':''}><td>${s.item}</td>`;
-    s.vals.forEach(v => {
-      html += `<td>${v.avg.toFixed(2)}</td>`;
+    html += `<tr><td>${s.item}</td>`;
+    dims.forEach(d => {
+      const val = s.vals.find(v => v.dim === d);
+      html += `<td>${val ? val.avg.toFixed(2) : '-'}</td>`;
     });
-    html += `<td>${s.vals[0].n}</td><td>${s.comments.map(c=>`<div style='margin-bottom:0.5em;'>${c}</div>`).join('')}</td></tr>`;
+    html += `<td>${s.vals[0]?.n || 0}</td><td>${s.comments.length}</td></tr>`;
   });
-  html += `</tbody></table></div>`;
+  html += '</tbody></table></div>';
   html += `<div style='text-align:right;margin-top:1.5em;'><button id='close-analysis'>Cerrar</button></div></div>`;
-  // Show as modal
   const modal = document.createElement('div');
   modal.style.position = 'fixed';
   modal.style.top = '0';
@@ -1319,7 +1333,7 @@ window.analysisSharedProject = async function(ownerId, projectId) {
   modal.style.height = '100vh';
   modal.style.background = 'rgba(0,0,0,0.15)';
   modal.style.zIndex = '9999';
-  modal.innerHTML = `<div style='max-width:700px;margin:3em auto;background:#fff;padding:2em;border-radius:1em;'>${html}</div>`;
+  modal.innerHTML = `<div style='max-width:520px;margin:3em auto;'>${html}</div>`;
   document.body.appendChild(modal);
   document.getElementById('close-analysis').onclick = () => document.body.removeChild(modal);
 };
@@ -1375,4 +1389,65 @@ window.shareSharedProject = async function(ownerId, projectId) {
       alert('No se pudo copiar automáticamente. Selecciona y copia el link.');
     }
   };
+};
+
+window.openShareModalShared = async function(ownerId, projectId) {
+  // Check if current user can share this project (they need to be the owner)
+  if (ownerId !== currentUser.uid) {
+    alert('Solo el propietario puede compartir este proyecto.');
+    return;
+  }
+  
+  // Fetch current sharing status
+  const doc = await db.collection('users').doc(ownerId).collection('projects').doc(projectId).get();
+  if (!doc.exists) {
+    alert('Proyecto no encontrado.');
+    return;
+  }
+  const project = doc.data();
+  const sharedWith = project.sharedWith || [];
+  
+  // Show modal with current shares and add/remove options
+  let html = `<div class='judge-card'><h3>Compartir proyecto</h3>`;
+  html += `<div style='margin-bottom:1em;'><input type='email' id='share-email' placeholder='Correo del usuario' style='width:100%;padding:0.5em;' /><button id='add-share-btn' style='margin-left:0.5em;'>Agregar</button></div>`;
+  if (sharedWith.length) {
+    html += `<div style='margin-bottom:1em;'><strong>Compartido con:</strong><ul style='margin:0.5em 0;'>`;
+    sharedWith.forEach(email => {
+      html += `<li style='display:flex;justify-content:space-between;align-items:center;margin-bottom:0.3em;'>${email} <button class='remove-share-btn' data-email='${email}' style='color:#c00;background:none;border:none;cursor:pointer;'>×</button></li>`;
+    });
+    html += '</ul></div>';
+  } else {
+    html += '<p style="color:#888;">No compartido con nadie.</p>';
+  }
+  html += `<div style='text-align:right;margin-top:1.5em;'><button id='close-share-modal'>Cerrar</button></div></div>`;
+  
+  const modalDiv = document.createElement('div');
+  modalDiv.style.position = 'fixed';
+  modalDiv.style.top = '0';
+  modalDiv.style.left = '0';
+  modalDiv.style.width = '100vw';
+  modalDiv.style.height = '100vh';
+  modalDiv.style.background = 'rgba(0,0,0,0.15)';
+  modalDiv.style.zIndex = '9999';
+  document.body.appendChild(modalDiv);
+  modalDiv.innerHTML = `<div style='max-width:520px;margin:3em auto;background:#fff;padding:2em;border-radius:1em;'>${html}</div>`;
+  document.getElementById('close-share-modal').onclick = () => document.body.removeChild(modalDiv);
+  document.getElementById('add-share-btn').onclick = async () => {
+    const email = document.getElementById('share-email').value.trim();
+    if (!email) return alert('Ingrese un correo.');
+    const res = await shareProjectWithEmail(projectId, email);
+    if (res.error) return alert(res.error);
+    await syncSharedProjectsForUser();
+    alert('¡Compartido exitosamente!');
+    document.body.removeChild(modalDiv);
+  };
+  document.querySelectorAll('.remove-share-btn').forEach(btn => {
+    btn.onclick = async () => {
+      const email = btn.getAttribute('data-email');
+      await unshareProjectWithEmail(projectId, email);
+      await syncSharedProjectsForUser();
+      alert('Acceso quitado.');
+      document.body.removeChild(modalDiv);
+    };
+  });
 };
