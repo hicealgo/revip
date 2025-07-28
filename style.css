@@ -258,3 +258,51 @@ input[type="text"].item-comment {
   color: #888;
   margin-left: 0;
 } 
+
+@media (max-width: 600px) {
+  #app, .judge-container {
+    max-width: 100vw;
+    padding: 1rem 0.5rem 4rem 0.5rem;
+  }
+  .card, .judge-card {
+    padding: 1em;
+    margin-bottom: 1em;
+    min-width: 0;
+  }
+  h1, h2, h3 {
+    font-size: 1.1em;
+  }
+  button, input, textarea, select {
+    font-size: 1em;
+    padding: 0.7em 1em;
+  }
+  .icon-btn {
+    width: 2.5em;
+    height: 2.5em;
+    min-width: 2.5em;
+    min-height: 2.5em;
+    padding: 0.3em;
+  }
+  .flex {
+    flex-direction: column;
+    gap: 0.5em;
+  }
+  .flex-center {
+    align-items: stretch;
+    justify-content: stretch;
+  }
+  .progress-bar {
+    height: 6px;
+  }
+  .judge-item-text {
+    font-size: 1.05em;
+  }
+  .judge-card, .card {
+    font-size: 1em;
+  }
+  footer {
+    font-size: 0.95em !important;
+    padding: 1em 0 0.5em 0;
+    margin: 2em 0 1em 0 !important;
+  }
+} 
