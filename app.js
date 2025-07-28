@@ -306,7 +306,22 @@ window.shareProject = async function(id) {
   // Detect base path for local or GitHub Pages
   let base = window.location.origin + window.location.pathname;
   if (base.endsWith('/')) base = base.slice(0, -1);
-  let publicPath = base.includes('/revip') ? base.replace(/\/[^/]*$/, '') + '/public.html' : window.location.origin + '/public.html';
+  
+  // More robust URL generation
+  let publicPath;
+  if (window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1') {
+    // Local development
+    publicPath = window.location.origin + '/public.html';
+  } else if (window.location.pathname.includes('/revip')) {
+    // GitHub Pages
+    publicPath = window.location.origin + '/revip/public.html';
+  } else {
+    // Fallback
+    publicPath = window.location.origin + '/public.html';
+  }
+  
+  console.log('Generated public path:', publicPath);
+  
   const url = new URL(publicPath);
   url.searchParams.set('userId', currentUser.uid);
   url.searchParams.set('projectId', id);
@@ -1316,10 +1331,21 @@ window.shareSharedProject = async function(ownerId, projectId) {
     return;
   }
   
-  // Detect base path for local or GitHub Pages
-  let base = window.location.origin + window.location.pathname;
-  if (base.endsWith('/')) base = base.slice(0, -1);
-  let publicPath = base.includes('/revip') ? base.replace(/\/[^/]*$/, '') + '/public.html' : window.location.origin + '/public.html';
+  // More robust URL generation
+  let publicPath;
+  if (window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1') {
+    // Local development
+    publicPath = window.location.origin + '/public.html';
+  } else if (window.location.pathname.includes('/revip')) {
+    // GitHub Pages
+    publicPath = window.location.origin + '/revip/public.html';
+  } else {
+    // Fallback
+    publicPath = window.location.origin + '/public.html';
+  }
+  
+  console.log('Generated public path:', publicPath);
+  
   const url = new URL(publicPath);
   url.searchParams.set('userId', ownerId);
   url.searchParams.set('projectId', projectId);
