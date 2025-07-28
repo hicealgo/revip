@@ -433,24 +433,33 @@ async function shareProjectWithEmail(projectId, email) {
   if (!email || typeof email !== 'string') return { error: 'Correo inválido.' };
   email = email.trim().toLowerCase();
   if (email === currentUser.email) return { error: 'No puede compartir consigo mismo.' };
-  
   try {
     console.log('Sharing project:', projectId, 'with email:', email);
-    
     // Get project
-    const ref = db.collection('users').doc(currentUser.uid).collection('projects').doc(projectId);
-    const doc = await ref.get();
+    // --- FIX: Find the real ownerId ---
+    let ref = db.collection('users').doc(currentUser.uid).collection('projects').doc(projectId);
+    let doc = await ref.get();
+    if (!doc.exists) {
+      // Try to find the project in sharedProjects (cascade share)
+      const sharedRef = await db.collection('users').doc(currentUser.uid).collection('sharedProjects').doc(projectId).get();
+      if (sharedRef.exists) {
+        const sharedData = sharedRef.data();
+        if (sharedData && sharedData.ownerId) {
+          ref = db.collection('users').doc(sharedData.ownerId).collection('projects').doc(projectId);
+          doc = await ref.get();
+        }
+      }
+    }
     if (!doc.exists) return { error: 'Proyecto no encontrado.' };
-    
     const project = doc.data();
+    // --- Use the real ownerId ---
+    const realOwnerId = ref.parent.parent.id;
     let sharedWith = Array.isArray(project.sharedWith) ? project.sharedWith : [];
     if (sharedWith.includes(email)) return { error: 'Ya compartido con este correo.' };
     if (sharedWith.length >= 10) return { error: 'Máximo 10 personas por proyecto.' };
-    
     sharedWith.push(email);
     console.log('Updating project with sharedWith:', sharedWith);
     await ref.update({ sharedWith });
-    
     // If user exists, add to their sharedProjects
     console.log('Looking for user with email:', email);
     const userSnap = await db.collection('users').where('email', '==', email).get();
@@ -458,7 +467,7 @@ async function shareProjectWithEmail(projectId, email) {
       const guestId = userSnap.docs[0].id;
       console.log('Found user, adding to sharedProjects:', guestId);
       await db.collection('users').doc(guestId).collection('sharedProjects').doc(projectId).set({
-        ownerId: currentUser.uid,
+        ownerId: realOwnerId,
         projectId,
         sharedAt: Date.now(),
       });
@@ -466,7 +475,6 @@ async function shareProjectWithEmail(projectId, email) {
     } else {
       console.log('User not found, will be added when they log in');
     }
-    
     return { success: true };
   } catch (error) {
     console.error('Error sharing project:', error);
@@ -495,22 +503,35 @@ async function unshareProjectWithEmail(projectId, email) {
 // When a user logs in, sync their sharedProjects with projects where their email is in sharedWith
 async function syncSharedProjectsForUser() {
   if (!currentUser) return;
-  
   try {
     console.log('Syncing shared projects for user:', currentUser.email);
-    
-    // First, let's check if we can access the user's own data
-    const userDoc = await db.collection('users').doc(currentUser.uid).get();
-    console.log('Can access own user document:', userDoc.exists);
-    
-    // Try a more targeted approach - only check projects that might be shared
-    // Instead of scanning all users, we'll rely on the sharing process to create the references
-    console.log('Skipping full sync due to permissions - will rely on manual sharing process');
+    // Scan all users' projects for any project where sharedWith includes current user's email
+    const usersSnap = await db.collection('users').get();
+    for (const userDoc of usersSnap.docs) {
+      const ownerId = userDoc.id;
+      const projectsSnap = await db.collection('users').doc(ownerId).collection('projects').get();
+      for (const projDoc of projectsSnap.docs) {
+        const project = projDoc.data();
+        const projectId = projDoc.id;
+        let sharedWith = Array.isArray(project.sharedWith) ? project.sharedWith : [];
+        if (sharedWith.includes(currentUser.email)) {
+          // Add to my sharedProjects if not already present
+          const myRef = db.collection('users').doc(currentUser.uid).collection('sharedProjects').doc(projectId);
+          const myDoc = await myRef.get();
+          if (!myDoc.exists) {
+            await myRef.set({
+              ownerId,
+              projectId,
+              sharedAt: Date.now(),
+            });
+            console.log('Added shared project:', projectId, 'from owner:', ownerId);
+          }
+        }
+      }
+    }
     return 0;
-    
   } catch (error) {
     console.error('Error syncing shared projects:', error);
-    console.log('This is likely due to Firestore security rules. The sharing will work when projects are manually shared.');
     return 0;
   }
 }
